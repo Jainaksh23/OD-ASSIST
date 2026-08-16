@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OD Assist — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/admin.css" />
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <span>⚡</span> OD Assist <span class="badge">Admin</span>
+      </div>
+      <p class="login-sub">Sign in to manage knowledge sources</p>
+
+      <form id="login-form">
+        <div class="field-group">
+          <label>Username</label>
+          <input id="lg-username" type="text" placeholder="odadmin" required />
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input id="lg-password" type="password" placeholder="••••••••" required />
+        </div>
+        <button type="submit" id="login-btn" class="btn-primary">
+          <span id="login-btn-label">Sign In</span>
+          <span id="login-spinner" class="hidden">...</span>
+        </button>
+      </form>
+
+      <p id="login-error" class="error-msg hidden"></p>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="screen hidden layout-admin">
+    
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span>⚡</span> OD Assist <span class="badge">Admin</span>
+      </div>
+      
+      <div class="sidebar-stats">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-completed">0</div>
+          <div class="stat-label">Done</div>
+        </div>
+      </div>
+      
+      <h3 class="sidebar-heading">Sources List</h3>
+      <nav class="sidebar-source-list" id="sidebar-sources">
+        <!-- JS injects nav items -->
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="main-header">
+        <h2>Manage Knowledge</h2>
+        <div class="header-actions">
+          <span id="topbar-user" class="user-chip">odadmin</span>
+          <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
+          <button id="logout-btn" class="icon-btn" aria-label="Sign out">🚪</button>
+        </div>
+      </header>
+
+      <div class="main-scroll">
+        <!-- Ingest Card -->
+        <section class="card">
+          <h3 class="card-title">Add Knowledge Source</h3>
+          <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="pdf">📄 PDF Upload</button>
+            <button class="tab-btn" data-tab="drive">🔗 Drive Link</button>
+            <button class="tab-btn" data-tab="text">📝 Raw Text</button>
+            <button class="tab-btn" data-tab="bulk">📚 Bulk Import</button>
+          </nav>
+
+          <!-- PDF Tab -->
+          <div id="tab-pdf" class="tab-panel active">
+            <div id="dropzone" class="dropzone">
+              <p class="dz-label">Drop PDF here or click to browse</p>
+              <p class="dz-hint">Max 50 MB</p>
+              <input id="pdf-file-input" type="file" accept=".pdf" hidden />
+            </div>
+            <div id="pdf-filename" class="filename-chip hidden"></div>
+            <div class="field-group">
+              <label>Source Title (optional)</label>
+              <input id="pdf-title" type="text" placeholder="e.g. ERP Fee Module Training" />
+            </div>
+            <button id="pdf-submit" class="btn-primary" disabled>
+              <span id="pdf-btn-label">Ingest PDF</span>
+              <span id="pdf-spinner" class="hidden">...</span>
+            </button>
+          </div>
+
+          <!-- Drive Tab -->
+          <div id="tab-drive" class="tab-panel hidden">
+            <div class="field-group">
+              <label>Google Drive Share Link</label>
+              <input id="drive-url" type="url" placeholder="https://drive.google.com/file/d/…" />
+            </div>
+            <div class="field-group">
+              <label>Source Title (optional)</label>
+              <input id="drive-title" type="text" placeholder="e.g. Q2 Town Hall" />
+            </div>
+            <div class="field-group">
+              <label>Content Type</label>
+              <select id="drive-type">
+                <option value="drive_doc">Document / PDF</option>
+                <option value="drive_video">Video Recording</option>
+              </select>
+            </div>
+            <button id="drive-submit" class="btn-primary">
+              <span id="drive-btn-label">Ingest Drive Link</span>
+              <span id="drive-spinner" class="hidden">...</span>
+            </button>
+          </div>
+
+          <!-- Raw Text Tab -->
+          <div id="tab-text" class="tab-panel hidden">
+            <div class="field-group">
+              <label>Source Title (optional)</label>
+              <input id="text-title" type="text" placeholder="e.g. Fee Policy Update" />
+            </div>
+            <div class="field-group">
+              <label>Text Content</label>
+              <textarea id="text-content" rows="6" placeholder="Paste your content here…"></textarea>
+            </div>
+            <button id="text-submit" class="btn-primary">
+              <span id="text-btn-label">Ingest Text</span>
+              <span id="text-spinner" class="hidden">...</span>
+            </button>
+          </div>
+
+          <!-- Bulk Import Tab -->
+          <div id="tab-bulk" class="tab-panel hidden">
+            <div class="field-group">
+              <label>Bulk Content (Title | Drive Link per line)</label>
+              <textarea id="bulk-content" rows="6" placeholder="Q1 Update | https://drive.google.com/file/d/...&#10;Onboarding Video | https://drive.google.com/file/d/..."></textarea>
+            </div>
+            <button id="bulk-submit" class="btn-primary">
+              <span id="bulk-btn-label">Ingest Bulk Data</span>
+              <span id="bulk-spinner" class="hidden">...</span>
+            </button>
+          </div>
+
+          <div id="ingest-banner" class="banner hidden"></div>
+        </section>
+
+        <!-- Sources Section -->
+        <section class="sources-section">
+          <div class="section-header">
+            <h3>Sources</h3>
+          </div>
+          <div id="sources-loading" class="placeholder-state">Loading sources…</div>
+          <div id="sources-empty" class="placeholder-state hidden">No sources yet. Add one above.</div>
+          
+          <div id="sources-grid" class="sources-grid hidden">
+            <!-- Source cards injected here -->
+          </div>
+        </section>
+
+        <!-- Manage Users Section -->
+        <section class="card" style="margin-top: 2rem;">
+          <h3 class="card-title">Manage Users</h3>
+          <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <!-- Create User Form -->
+            <div style="flex: 1; min-width: 250px;">
+              <form id="create-user-form">
+                <div class="field-group">
+                  <label>Username</label>
+                  <input id="new-username" type="text" placeholder="e.g. hr_manager" required />
+                </div>
+                <div class="field-group">
+                  <label>Password</label>
+                  <input id="new-password" type="password" placeholder="••••••••" required />
+                </div>
+                <div class="field-group">
+                  <label>Role</label>
+                  <select id="new-role" required>
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button type="submit" id="user-submit" class="btn-primary">
+                  <span id="user-btn-label">Create User</span>
+                  <span id="user-spinner" class="hidden">...</span>
+                </button>
+              </form>
+            </div>
+            <!-- Users List -->
+            <div style="flex: 2; min-width: 300px;">
+              <div id="users-loading" class="placeholder-state" style="padding: 1rem;">Loading users…</div>
+              <div id="users-list" class="users-list hidden" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- User items injected here -->
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3>Delete Source?</h3>
+      <p id="modal-body">This will permanently remove the source and all its indexed chunks.</p>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn-ghost">Cancel</button>
+        <button id="modal-confirm" class="btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>

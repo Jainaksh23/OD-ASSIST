@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OD Assist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/user.css" />
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen">
+    <div class="login-card">
+      <div class="login-logo">OD Assist</div>
+      <p class="login-sub">Your organizational knowledge assistant</p>
+      <form id="login-form">
+        <div class="field-group">
+          <label>Username</label>
+          <input id="username" type="text" placeholder="oduser" required />
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input id="password" type="password" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn-primary">Sign In</button>
+      </form>
+      <p id="login-error" class="error-msg hidden"></p>
+    </div>
+  </div>
+
+  <!-- Chat App -->
+  <div id="chat-app" class="screen hidden">
+    <header class="chat-header">
+      <div class="header-left">
+        <div class="avatar">⚡</div>
+        <div class="header-info">
+          <h1>OD Assist</h1>
+          <p class="tagline">Your Okie Dokie knowledge assistant</p>
+        </div>
+        <span class="badge">AI POWERED • ALWAYS ON</span>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
+        <button id="logout-btn" class="icon-btn" aria-label="Sign out">🚪</button>
+      </div>
+    </header>
+
+    <main id="messages">
+      <div class="message assistant-msg">
+        <div class="bubble">Hello! I am OD Assist. How can I help you with Okie Dokie knowledge today?</div>
+      </div>
+    </main>
+
+    <footer class="input-bar">
+      <form id="chat-form">
+        <input id="query-input" type="text" placeholder="Ask a question about OD knowledge…" required autocomplete="off" />
+        <button type="submit" id="send-btn" class="circle-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </button>
+      </form>
+    </footer>
+  </div>
+
+  <script src="/static/user.js"></script>
+</body>
+</html>
