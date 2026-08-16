@@ -1,6 +1,7 @@
 import os
 import subprocess
 from groq import Groq
+import imageio_ffmpeg
 
 # 25 MB in bytes (Groq whisper limit)
 MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
@@ -12,10 +13,11 @@ def extract_and_transcribe_video(file_path: str, client: Groq) -> str:
     Extracts audio using ffmpeg, splits if > 25MB, and transcribes via Groq Whisper.
     """
     output_audio = file_path + ".mp3"
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     
     # 1. Extract audio
     cmd = [
-        "ffmpeg", "-i", file_path,
+        ffmpeg_exe, "-i", file_path,
         "-q:a", "0",
         "-map", "a",
         output_audio,
@@ -37,7 +39,7 @@ def extract_and_transcribe_video(file_path: str, client: Groq) -> str:
             # Let's use ffmpeg segmenter: 10 mins chunks (usually < 15MB for mp3)
             segment_pattern = file_path + "_part%03d.mp3"
             split_cmd = [
-                "ffmpeg", "-i", output_audio,
+                ffmpeg_exe, "-i", output_audio,
                 "-f", "segment",
                 "-segment_time", "600",
                 "-c", "copy",

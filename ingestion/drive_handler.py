@@ -1,4 +1,5 @@
 import os
+# pyrefly: ignore [missing-import]
 import gdown
 from ingestion.input_router import detect_source_type
 
@@ -19,6 +20,25 @@ def _gdown_download(**kwargs):
     behaviors to a single raised Exception.
     """
     try:
+        import sys
+        import re
+        
+        # Monkey patch osp.join inside gdown.download module to sanitize destination filenames
+        # This prevents WinError 87 on Windows when Drive filenames contain colons or other invalid chars.
+        download_mod = sys.modules.get('gdown.download')
+        if download_mod and not hasattr(download_mod, '_original_osp_join'):
+            download_mod._original_osp_join = download_mod.osp.join
+            
+            def safe_join(path, *paths):
+                sanitized_paths = []
+                for p in paths:
+                    if isinstance(p, str):
+                        p = re.sub(r'[<>:"/\\|?*]', '_', p).replace('\ufffd', '_')
+                    sanitized_paths.append(p)
+                return download_mod._original_osp_join(path, *sanitized_paths)
+                
+            download_mod.osp.join = safe_join
+
         try:
             return gdown.download(**kwargs)
         except TypeError as e:
@@ -43,9 +63,9 @@ def fetch_from_drive(url: str, output_dir: str) -> tuple[str, str]:
     # to pass conditionally based on URL shape.
     is_native_gdoc = "docs.google.com" in url
     if is_native_gdoc:
-        output_path = _gdown_download(url=url, output=output_dir + "/", quiet=True, fuzzy=True, format="pdf")
+        output_path = _gdown_download(url=url, output=output_dir + os.sep, quiet=True, fuzzy=True, format="pdf")
     else:
-        output_path = _gdown_download(url=url, output=output_dir + "/", quiet=True, fuzzy=True)
+        output_path = _gdown_download(url=url, output=output_dir + os.sep, quiet=True, fuzzy=True)
 
     if not output_path:
         raise Exception(f"Failed to download from Drive URL: {url}")
