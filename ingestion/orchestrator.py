@@ -12,6 +12,7 @@ import os
 
 from db.db import SessionLocal
 from db.models import Chunk, Source
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from ingestion.chunker import get_chunks
 from ingestion.drive_handler import fetch_from_drive
 from ingestion.embedder import embed_chunks
@@ -64,13 +65,28 @@ def process_source(
         embeddings = embed_chunks(chunks_text, embedder)
 
         db_chunks = []
+        
+        # Parallelize the enrichment calls (Groq API) since sequential is too slow
+        summaries = [None] * len(chunks_text)
+        
+        def _enrich_worker(index, text):
+            return index, enrich_chunk(text, groq_client)
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [
+                executor.submit(_enrich_worker, i, chunk)
+                for i, chunk in enumerate(chunks_text)
+            ]
+            for future in as_completed(futures):
+                idx, summary = future.result()
+                summaries[idx] = summary
+
         for i, text_chunk in enumerate(chunks_text):
-            summary = enrich_chunk(text_chunk, groq_client)
             db_chunks.append(
                 Chunk(
                     source_id=source.id,
                     chunk_text=text_chunk,
-                    chunk_summary=summary,
+                    chunk_summary=summaries[i],
                     embedding=embeddings[i],
                 )
             )
