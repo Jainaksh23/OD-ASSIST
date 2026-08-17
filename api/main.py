@@ -33,6 +33,9 @@ from fastapi.staticfiles import StaticFiles
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from api.auth import (create_access_token, get_current_user, require_admin,
                       verify_password, get_password_hash)
@@ -87,6 +90,10 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -350,10 +357,11 @@ def list_users(
 # ── Chat ──────────────────────────────────────────────────────────────────────
 
 @app.post("/chat/query", response_model=QueryResponse, tags=["chat"])
+@limiter.limit("15/minute")
 def query_bot(
+    request: Request,
     body: QueryRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
     embedder=Depends(get_embedder),
     groq_client=Depends(get_groq),
 ):
@@ -371,7 +379,7 @@ def query_bot(
         source_metas = [SourceMetadata(id=s.id, title=s.title or f"Source {s.id}") for s in sources]
 
     log_entry = QueryLog(
-        user_id=user.id,
+        user_id=None,
         query=body.query,
         answer=gen["answer"],
         sources_used=json.dumps(gen["sources_used"]),
@@ -389,10 +397,11 @@ def query_bot(
 
 
 @app.post("/chat/feedback", tags=["chat"])
+@limiter.limit("15/minute")
 def submit_feedback(
+    request: Request,
     body: FeedbackRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
     if body.feedback not in ("up", "down"):
         raise HTTPException(status_code=400, detail="feedback must be 'up' or 'down'")
