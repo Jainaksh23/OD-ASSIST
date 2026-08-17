@@ -58,36 +58,40 @@
     <main id="messages">
       <!-- Empty state, shown until first message is sent -->
       <div id="empty-state" class="empty-state">
+        <div class="bg-blob"></div>
         <div class="empty-avatar">⚡</div>
-        <h2>Kya jaanna chahte hain?</h2>
-        <p>Fee, admission, transport, payroll — kuch bhi poochho, main Okie Dokie ke documents se jawab dhoondh dunga.
-        </p>
+        <h2>What would you like to know?</h2>
+        <p>Ask anything about fees, admissions, transport, or payroll — I'll find the answer from Okie Dokie's documents.</p>
         <div class="suggestion-grid" id="suggestion-grid">
-          <button class="suggestion-chip" data-q="Fee collection process kya hai?">
-            <span class="chip-icon">💰</span> Fee collection kaise karein?
+          <button class="suggestion-chip" data-q="How does fee collection work?" style="animation-delay: 0ms;">
+            <span class="chip-icon">💰</span> How does fee collection work?
           </button>
-          <button class="suggestion-chip" data-q="Naya student admission kaise karte hain?">
-            <span class="chip-icon">🎓</span> Naya student admission
+          <button class="suggestion-chip" data-q="New student admission process" style="animation-delay: 50ms;">
+            <span class="chip-icon">🎓</span> New student admission process
           </button>
-          <button class="suggestion-chip" data-q="Transport module setup kaise karein?">
-            <span class="chip-icon">🚌</span> Transport setup
+          <button class="suggestion-chip" data-q="Transport module setup" style="animation-delay: 100ms;">
+            <span class="chip-icon">🚌</span> Transport module setup
           </button>
-          <button class="suggestion-chip" data-q="Payroll process kaise chalta hai?">
-            <span class="chip-icon">🧾</span> Payroll kaise chalayein?
+          <button class="suggestion-chip" data-q="How is payroll processed?" style="animation-delay: 150ms;">
+            <span class="chip-icon">🧾</span> How is payroll processed?
           </button>
-          <button class="suggestion-chip" data-q="GPS config kaise set karein?">
-            <span class="chip-icon">📍</span> GPS config
+          <button class="suggestion-chip" data-q="GPS configuration" style="animation-delay: 200ms;">
+            <span class="chip-icon">📍</span> GPS configuration
           </button>
-          <button class="suggestion-chip" data-q="Student promote kaise karte hain agle session mein?">
-            <span class="chip-icon">📈</span> Student promote
+          <button class="suggestion-chip" data-q="Student promotion process" style="animation-delay: 250ms;">
+            <span class="chip-icon">📈</span> Student promotion process
           </button>
         </div>
+        <div id="rotating-tips" class="rotating-tips"></div>
       </div>
     </main>
 
+    <button id="scroll-bottom-btn" class="circle-btn scroll-bottom hidden" aria-label="Scroll to bottom">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+    </button>
     <footer class="input-bar">
       <form id="chat-form">
-        <textarea id="query-input" rows="1" placeholder="Ask a question about OD knowledge…" required
+        <textarea id="query-input" rows="1" placeholder="Ask a question..." required
           autocomplete="off"></textarea>
         <button type="submit" id="send-btn" class="circle-btn" aria-label="Send message">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"

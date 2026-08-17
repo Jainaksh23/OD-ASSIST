@@ -12,6 +12,7 @@ const chatForm = document.getElementById("chat-form");
 const queryInput = document.getElementById("query-input");
 const sendBtn = document.getElementById("send-btn");
 const themeToggle = document.getElementById("theme-toggle");
+const scrollBottomBtn = document.getElementById("scroll-bottom-btn");
 
 // Init
 if (token) {
@@ -82,6 +83,45 @@ function hideEmptyState() {
     if (emptyState && !emptyState.classList.contains("hidden")) {
         emptyState.classList.add("hidden");
     }
+}
+
+// Rotating Tips
+const tips = [
+    "Tip: You can ask follow-up questions too",
+    "Tip: I cite my sources for every answer",
+    "Tip: Switch to dark mode from the header",
+    "Tip: Use Shift+Enter for a new line"
+];
+let tipIndex = 0;
+const rotatingTipsEl = document.getElementById("rotating-tips");
+if (rotatingTipsEl) {
+    const tipDiv = document.createElement("div");
+    tipDiv.className = "tip-text active";
+    tipDiv.textContent = tips[0];
+    rotatingTipsEl.appendChild(tipDiv);
+    
+    setInterval(() => {
+        tipDiv.classList.remove("active");
+        setTimeout(() => {
+            tipIndex = (tipIndex + 1) % tips.length;
+            tipDiv.textContent = tips[tipIndex];
+            tipDiv.classList.add("active");
+        }, 500); 
+    }, 4500);
+}
+
+// Scroll to bottom logic
+if (scrollBottomBtn) {
+    chatBox.addEventListener("scroll", () => {
+        if (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 150) {
+            scrollBottomBtn.classList.remove("hidden");
+        } else {
+            scrollBottomBtn.classList.add("hidden");
+        }
+    });
+    scrollBottomBtn.addEventListener("click", () => {
+        scrollToBottom();
+    });
 }
 
 // Suggested prompt chips
@@ -163,58 +203,108 @@ function avatarHTML(role) {
     return `<div class="msg-avatar">⚡</div>`;
 }
 
+function getTimestamp() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 function appendMessage(text, role) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message ${role}-msg`;
-    msgDiv.innerHTML = `${avatarHTML(role)}<div class="bubble">${escapeHTML(text)}</div>`;
+    msgDiv.innerHTML = `${avatarHTML(role)}<div class="bubble">${escapeHTML(text)}<span class="msg-timestamp">${getTimestamp()}</span></div>`;
     chatBox.appendChild(msgDiv);
     scrollToBottom();
+}
+
+function generateFollowUps(text) {
+    const lowerText = text.toLowerCase();
+    const chips = [];
+    if (lowerText.includes("fee")) chips.push("How is the fee calculated?", "Can I pay fees online?");
+    else if (lowerText.includes("admission")) chips.push("What are the admission requirements?", "Admission form link");
+    else if (lowerText.includes("transport")) chips.push("Transport fee details", "Bus route tracking");
+    else if (lowerText.includes("payroll")) chips.push("When is payroll processed?", "View my payslip");
+    else if (lowerText.includes("student")) chips.push("Student attendance policy", "How to view student marks");
+    
+    if (chips.length === 0) chips.push("Tell me more about this", "What else should I know?");
+    return chips.slice(0, 2);
+}
+
+function typeWriter(element, htmlContent, onComplete) {
+    let i = 0;
+    let isTag = false;
+    let text = "";
+    function type() {
+        if (i < htmlContent.length) {
+            text += htmlContent.charAt(i);
+            element.innerHTML = text;
+            if (htmlContent.charAt(i) === '<') isTag = true;
+            if (htmlContent.charAt(i) === '>') isTag = false;
+            i++;
+            if (isTag) {
+                type();
+            } else {
+                setTimeout(type, 15); // Fast typewriter
+            }
+            scrollToBottom();
+        } else {
+            if(onComplete) onComplete();
+        }
+    }
+    type();
 }
 
 function appendAssistantMessage(data) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message assistant-msg`;
-
-    let bubble = `<div class="bubble">`;
-
-    if (data.confidence === "low") {
-        bubble += `<div class="confidence-disclaimer">⚠️ I am not entirely confident about this answer based on the provided sources.</div>`;
-    }
-
-    bubble += `${formatAnswer(data.answer)}`;
-
-    // Sources Accordion
-    if (data.sources && data.sources.length > 0) {
-        let sourcesHtml = data.sources.map(s => `<li>[${s.id}] ${escapeHTML(s.title)}</li>`).join("");
-
-        bubble += `
-        <div class="sources-accordion">
-            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
-                <span>View Sources (${data.sources.length})</span>
-                <span>▼</span>
-            </div>
-            <div class="accordion-content">
-                <ul>${sourcesHtml}</ul>
-            </div>
-        </div>
-        `;
-    }
-
-    // Feedback buttons
-    if (data.query_id) {
-        bubble += `
-        <div class="feedback-box" id="feedback-${data.query_id}">
-            <button class="feedback-btn" onclick="submitFeedback(${data.query_id}, 'up', this)">👍</button>
-            <button class="feedback-btn" onclick="submitFeedback(${data.query_id}, 'down', this)">👎</button>
-        </div>
-        `;
-    }
-
-    bubble += `</div>`;
-
-    msgDiv.innerHTML = `${avatarHTML("assistant")}${bubble}`;
+    msgDiv.innerHTML = `${avatarHTML("assistant")}<div class="bubble" id="temp-bubble-${data.query_id}"></div>`;
     chatBox.appendChild(msgDiv);
-    scrollToBottom();
+    
+    const bubbleEl = msgDiv.querySelector('.bubble');
+    const formattedHtml = formatAnswer(data.answer);
+    
+    typeWriter(bubbleEl, formattedHtml, () => {
+        let extras = "";
+        
+        // Confidence dot
+        let confClass = "high";
+        if (data.confidence === "low") confClass = "low";
+        else if (data.confidence === "medium") confClass = "medium";
+        
+        extras += `<span class="msg-timestamp">${getTimestamp()} <span class="confidence-dot ${confClass}" title="Confidence: ${data.confidence}"></span></span>`;
+        
+        // Sources Accordion
+        if (data.sources && data.sources.length > 0) {
+            let sourcesHtml = data.sources.map(s => `<li>[${s.id}] ${escapeHTML(s.title)}</li>`).join("");
+            extras += `
+            <div class="sources-accordion">
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                    <span>View Sources (${data.sources.length})</span>
+                    <span>▼</span>
+                </div>
+                <div class="accordion-content">
+                    <ul>${sourcesHtml}</ul>
+                </div>
+            </div>`;
+        }
+
+        // Smart Follow-up Chips
+        const followUps = generateFollowUps(data.answer);
+        if (followUps.length > 0) {
+            const chipsHtml = followUps.map(f => `<button onclick="document.getElementById('query-input').value='${f}'; document.getElementById('chat-form').requestSubmit();">${f}</button>`).join("");
+            extras += `<div class="follow-up-chips">${chipsHtml}</div>`;
+        }
+
+        // Feedback buttons
+        if (data.query_id) {
+            extras += `
+            <div class="feedback-box" id="feedback-${data.query_id}">
+                <button class="feedback-btn" onclick="submitFeedback(${data.query_id}, 'up', this)">👍</button>
+                <button class="feedback-btn" onclick="submitFeedback(${data.query_id}, 'down', this)">👎</button>
+            </div>`;
+        }
+        
+        bubbleEl.innerHTML += extras;
+        scrollToBottom();
+    });
 }
 
 window.submitFeedback = async function (queryId, feedback, btnElem) {
@@ -226,8 +316,15 @@ window.submitFeedback = async function (queryId, feedback, btnElem) {
         });
         if (res.ok) {
             const box = document.getElementById(`feedback-${queryId}`);
-            box.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('active'));
+            box.querySelectorAll('.feedback-btn').forEach(b => {
+                b.classList.remove('active');
+                b.classList.remove('confetti');
+            });
             btnElem.classList.add('active');
+            if (feedback === 'up') {
+                btnElem.classList.add('confetti');
+                setTimeout(() => btnElem.classList.remove('confetti'), 700);
+            }
         }
     } catch (e) {
         console.error("Feedback error", e);
