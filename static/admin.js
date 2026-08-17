@@ -10,6 +10,7 @@ const API = window.location.origin;
 let token = sessionStorage.getItem('odAdminToken');
 let pollInterval = null;
 let pendingDeleteId = null;
+let modalAction    = null;   // 'delete' | 'retry-all'
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const loginScreen    = document.getElementById('login-screen');
@@ -68,8 +69,11 @@ const statCompleted  = document.getElementById('stat-completed');
 const themeToggle    = document.getElementById('theme-toggle');
 
 const confirmModal   = document.getElementById('confirm-modal');
+const modalTitle     = document.getElementById('modal-title');
 const modalCancel    = document.getElementById('modal-cancel');
 const modalConfirm   = document.getElementById('modal-confirm');
+const retryAllBtn    = document.getElementById('retry-all-btn');
+const retryAllCount  = document.getElementById('retry-all-count');
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 if (token) showDashboard();
@@ -307,9 +311,22 @@ function renderSources(sources) {
   sourcesLoading.classList.add('hidden');
 
   let completedCount = 0;
-  sources.forEach(s => { if (s.status === 'completed') completedCount++; });
+  let failedCount = 0;
+  sources.forEach(s => {
+    if (s.status === 'completed') completedCount++;
+    if (s.status === 'failed') failedCount++;
+  });
   statTotal.textContent = sources.length;
   statCompleted.textContent = completedCount;
+
+  // Update Retry All Failed button
+  retryAllCount.textContent = failedCount;
+  if (failedCount > 0) {
+    retryAllBtn.classList.remove('hidden');
+    retryAllBtn.disabled = false;
+  } else {
+    retryAllBtn.classList.add('hidden');
+  }
 
   if (!sources || sources.length === 0) {
     sourcesEmpty.classList.remove('hidden');
@@ -385,25 +402,55 @@ function renderSources(sources) {
 // ── Delete modal ──────────────────────────────────────────────────────────────
 function openDeleteModal(id, title) {
   pendingDeleteId = id;
+  modalAction = 'delete';
+  modalTitle.textContent = 'Delete Source?';
   document.getElementById('modal-body').textContent =
     `"${title}" and all its indexed chunks will be permanently removed.`;
+  modalConfirm.textContent = 'Delete';
+  modalConfirm.className = 'btn-danger';
   confirmModal.classList.remove('hidden');
 }
 
 modalCancel.addEventListener('click', () => {
   confirmModal.classList.add('hidden');
   pendingDeleteId = null;
+  modalAction = null;
 });
 
 confirmModal.addEventListener('click', (e) => {
-  if (e.target === confirmModal) { confirmModal.classList.add('hidden'); pendingDeleteId = null; }
+  if (e.target === confirmModal) { confirmModal.classList.add('hidden'); pendingDeleteId = null; modalAction = null; }
 });
 
 modalConfirm.addEventListener('click', async () => {
+  confirmModal.classList.add('hidden');
+
+  if (modalAction === 'retry-all') {
+    modalAction = null;
+    retryAllBtn.disabled = true;
+    retryAllBtn.textContent = '⏳ Retrying…';
+    try {
+      const res = await fetch(`${API}/admin/sources/retry-all`, { method: 'POST', headers: auth() });
+      if (res.status === 401) { handleExpiredToken(); return; }
+      if (res.ok) {
+        const data = await res.json();
+        toast(`${data.queued_count} sources queued for retry.`, 'success');
+        fetchSources();
+      } else {
+        toast('Failed to retry sources.', 'error');
+      }
+    } catch {
+      toast('Network error.', 'error');
+    } finally {
+      retryAllBtn.textContent = `🔄 Retry All Failed (0)`;
+      // fetchSources will update the button properly
+    }
+    return;
+  }
+
   if (!pendingDeleteId) return;
   const id = pendingDeleteId;
-  confirmModal.classList.add('hidden');
   pendingDeleteId = null;
+  modalAction = null;
 
   try {
     const res = await fetch(`${API}/admin/sources/${id}`, { method: 'DELETE', headers: auth() });
@@ -467,6 +514,20 @@ themeToggle.addEventListener('click', () => {
     document.documentElement.setAttribute('data-theme', 'dark');
     themeToggle.textContent = '☀️';
   }
+});
+
+// ── Retry All Failed ──────────────────────────────────────────────────────────
+retryAllBtn.addEventListener('click', () => {
+  const count = parseInt(retryAllCount.textContent, 10) || 0;
+  if (count === 0) return;
+  modalAction = 'retry-all';
+  pendingDeleteId = null;
+  modalTitle.textContent = 'Retry All Failed Sources?';
+  document.getElementById('modal-body').textContent =
+    `This will re-process ${count} failed source${count !== 1 ? 's' : ''}. Old chunks will be cleared first to prevent duplicates.`;
+  modalConfirm.textContent = `Retry ${count} Source${count !== 1 ? 's' : ''}`;
+  modalConfirm.className = 'btn-primary';
+  confirmModal.classList.remove('hidden');
 });
 
 // ── Users Management ──────────────────────────────────────────────────────────
