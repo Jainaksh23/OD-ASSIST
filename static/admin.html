@@ -160,6 +160,9 @@
         <section class="sources-section">
           <div class="section-header">
             <h3>Sources</h3>
+            <button id="retry-all-btn" class="btn-retry-all hidden" title="Retry all failed sources">
+              🔄 Retry All Failed (<span id="retry-all-count">0</span>)
+            </button>
           </div>
           <div id="sources-loading" class="placeholder-state">Loading sources…</div>
           <div id="sources-empty" class="placeholder-state hidden">No sources yet. Add one above.</div>
@@ -213,7 +216,7 @@
   <!-- Confirm Modal -->
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-box">
-      <h3>Delete Source?</h3>
+      <h3 id="modal-title">Delete Source?</h3>
       <p id="modal-body">This will permanently remove the source and all its indexed chunks.</p>
       <div class="modal-actions">
         <button id="modal-cancel" class="btn-ghost">Cancel</button>
