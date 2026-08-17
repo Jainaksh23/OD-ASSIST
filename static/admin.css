@@ -420,6 +420,35 @@ body {
   opacity: 0.8;
 }
 
+/* Sources section header */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.btn-retry-all {
+  background: linear-gradient(135deg, var(--warning), var(--primary-accent));
+  color: white;
+  border: none;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  letter-spacing: 0.2px;
+}
+.btn-retry-all:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.btn-retry-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-retry {
   background: var(--danger);
   color: white;
