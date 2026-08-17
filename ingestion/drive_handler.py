@@ -22,7 +22,13 @@ def _gdown_download(**kwargs):
     try:
         import sys
         import re
-        
+        import importlib
+
+        # Eagerly ensure gdown.download is imported so the monkey-patch
+        # always applies — even on the very first call in the process.
+        if 'gdown.download' not in sys.modules:
+            importlib.import_module('gdown.download')
+
         # Monkey patch osp.join inside gdown.download module to sanitize destination filenames
         # This prevents WinError 87 on Windows when Drive filenames contain colons or other invalid chars.
         download_mod = sys.modules.get('gdown.download')
