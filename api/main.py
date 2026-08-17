@@ -23,6 +23,8 @@ import json
 import logging
 import os
 import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import (BackgroundTasks, Depends, FastAPI, File, Form,
@@ -263,6 +265,58 @@ def retry_source(
         groq_client,
     )
     return source
+
+
+@app.post("/admin/sources/retry-all", tags=["admin"])
+def retry_all_failed(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    embedder=Depends(get_embedder),
+    groq_client=Depends(get_groq),
+):
+    """
+    Bulk-retry ALL failed sources.
+    Resets status → processing, clears stale chunks, then processes
+    sequentially (max 2 concurrent) in a background thread to avoid
+    Groq/HF rate-limit hits.
+    """
+    failed_sources = db.query(Source).filter(Source.status == "failed").all()
+    if not failed_sources:
+        return {"message": "No failed sources to retry", "queued_count": 0}
+
+    source_ids = []
+    for src in failed_sources:
+        # Clear old chunks to prevent duplicates
+        db.query(Chunk).filter(Chunk.source_id == src.id).delete()
+        src.status = "processing"
+        src.error_message = None
+        src.chunk_count = 0
+        source_ids.append(src.id)
+    db.commit()
+
+    # Process in a background thread — max 2 concurrent to respect rate limits
+    def _bulk_retry_worker(ids, emb, groq):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(process_source, sid, emb, groq) for sid in ids]
+            for f in futures:
+                try:
+                    f.result()
+                except Exception:
+                    logger.exception("retry-all: one source failed during reprocessing")
+
+    thread = threading.Thread(
+        target=_bulk_retry_worker,
+        args=(source_ids, embedder, groq_client),
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        "message": f"Queued {len(source_ids)} failed sources for retry",
+        "queued_count": len(source_ids),
+        "source_ids": source_ids,
+    }
 
 
 @app.post("/admin/bulk_ingest", tags=["admin"])
