@@ -15,31 +15,9 @@
 
 <body>
 
-  <!-- Login Screen -->
-  <div id="login-screen" class="screen">
-    <div class="login-bg-shape"></div>
-    <div class="login-card">
-      <div class="login-logo"><span class="logo-mark">⚡</span> OD Assist</div>
-      <p class="login-sub">Your Okie Dokie knowledge assistant</p>
-      <form id="login-form">
-        <div class="field-group">
-          <label>Username</label>
-          <input id="username" type="text" placeholder="oduser" required autocomplete="username" />
-        </div>
-        <div class="field-group">
-          <label>Password</label>
-          <input id="password" type="password" placeholder="••••••••" required autocomplete="current-password" />
-        </div>
-        <button type="submit" class="btn-primary">
-          <span>Sign In</span>
-        </button>
-      </form>
-      <p id="login-error" class="error-msg hidden"></p>
-    </div>
-  </div>
 
   <!-- Chat App -->
-  <div id="chat-app" class="screen hidden">
+  <div id="chat-app" class="screen">
     <header class="chat-header">
       <div class="header-left">
         <div class="avatar">⚡</div>
@@ -51,7 +29,6 @@
       <div class="header-actions">
         <span class="badge"><span class="badge-dot"></span>Online</span>
         <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
-        <button id="logout-btn" class="icon-btn" aria-label="Sign out">⏻</button>
       </div>
     </header>
 

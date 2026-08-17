@@ -1,11 +1,7 @@
 const API_BASE = window.location.origin;
-let token = sessionStorage.getItem("userToken");
 
 // DOM Elements
-const loginContainer = document.getElementById("login-screen");
 const chatContainer = document.getElementById("chat-app");
-const loginForm = document.getElementById("login-form");
-const logoutBtn = document.getElementById("logout-btn");
 const chatBox = document.getElementById("messages");
 const emptyState = document.getElementById("empty-state");
 const chatForm = document.getElementById("chat-form");
@@ -13,64 +9,14 @@ const queryInput = document.getElementById("query-input");
 const sendBtn = document.getElementById("send-btn");
 const themeToggle = document.getElementById("theme-toggle");
 const scrollBottomBtn = document.getElementById("scroll-bottom-btn");
-
-// Init
-if (token) {
-    showChat();
-}
-
 // Restore saved theme preference
 if (localStorage.getItem("odTheme") === "dark") {
     document.documentElement.setAttribute("data-theme", "dark");
     themeToggle.textContent = "☀️";
 }
 
-// Login
-loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
-    const errDiv = document.getElementById("login-error");
-    errDiv.classList.add("hidden");
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            token = data.access_token;
-            sessionStorage.setItem("userToken", token);
-            showChat();
-        } else {
-            errDiv.textContent = "Invalid credentials";
-            errDiv.classList.remove("hidden");
-        }
-    } catch (e) {
-        errDiv.textContent = "Connection error";
-        errDiv.classList.remove("hidden");
-    }
-});
-
-logoutBtn.addEventListener("click", () => {
-    sessionStorage.removeItem("userToken");
-    token = null;
-    loginContainer.classList.remove("hidden");
-    chatContainer.classList.add("hidden");
-});
-
-function showChat() {
-    loginContainer.classList.add("hidden");
-    chatContainer.classList.remove("hidden");
-    queryInput.focus();
-}
-
 function authHeaders() {
     return {
-        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json"
     };
 }
@@ -183,8 +129,8 @@ chatForm.addEventListener("submit", async (e) => {
         if (res.ok) {
             const data = await res.json();
             appendAssistantMessage(data);
-        } else if (res.status === 401) {
-            logoutBtn.click();
+        } else if (res.status === 429) {
+            appendMessage("Too many requests — please wait a moment before asking again.", "assistant");
         } else {
             appendMessage("Sorry, an error occurred while processing your query.", "assistant");
         }
