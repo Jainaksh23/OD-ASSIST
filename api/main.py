@@ -24,8 +24,10 @@ import logging
 import os
 import shutil
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import (BackgroundTasks, Depends, FastAPI, File, Form,
                      HTTPException, Request, UploadFile, status)
@@ -58,6 +60,68 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TEMP_DIR = "temp_files"
+AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
+STUCK_THRESHOLD_HOURS = 1    # sources in "processing" longer than this → reset
+
+
+# ── Auto-processor: picks up pending/stuck sources automatically ─────────────
+
+def _auto_process_pending(embedder, groq_client, stop_event: threading.Event):
+    """
+    Background daemon that periodically checks for pending or stuck sources
+    and processes them. Runs until stop_event is set (server shutdown).
+    """
+    logger.info("Auto-processor started (interval=%ds)", AUTO_PROCESS_INTERVAL)
+
+    while not stop_event.is_set():
+        try:
+            db = SessionLocal()
+
+            # Reset stuck "processing" sources (> threshold hours old)
+            threshold = datetime.now(timezone.utc) - timedelta(hours=STUCK_THRESHOLD_HOURS)
+            stuck = db.query(Source).filter(
+                Source.status == "processing",
+                Source.created_at < threshold,
+            ).all()
+            for s in stuck:
+                db.query(Chunk).filter(Chunk.source_id == s.id).delete()
+                s.status = "pending"
+                s.error_message = None
+                s.chunk_count = 0
+                logger.info("Auto-processor: reset stuck source ID:%d (%s)", s.id, s.title)
+            if stuck:
+                db.commit()
+
+            # Find pending sources
+            pending = db.query(Source).filter(Source.status == "pending").all()
+            pending_ids = [(s.id, s.title) for s in pending]
+            db.close()
+
+            if pending_ids:
+                logger.info("Auto-processor: found %d pending sources, processing...", len(pending_ids))
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    futures = {
+                        pool.submit(process_source, sid, embedder, groq_client): title
+                        for sid, title in pending_ids
+                    }
+                    for f in futures:
+                        try:
+                            f.result()
+                        except Exception:
+                            logger.exception(
+                                "Auto-processor: failed processing '%s'", futures[f]
+                            )
+
+        except Exception:
+            logger.exception("Auto-processor: cycle error")
+
+        # Sleep in small increments so we can respond to stop_event quickly
+        for _ in range(AUTO_PROCESS_INTERVAL):
+            if stop_event.is_set():
+                break
+            time.sleep(1)
+
+    logger.info("Auto-processor stopped")
 
 
 # ── Lifespan: all singletons initialized once at startup ─────────────────────
@@ -79,9 +143,24 @@ async def lifespan(app: FastAPI):
 
     os.makedirs(TEMP_DIR, exist_ok=True)
 
+    # Start auto-processor daemon thread
+    stop_event = threading.Event()
+    auto_thread = threading.Thread(
+        target=_auto_process_pending,
+        args=(app.state.embedder, app.state.groq_client, stop_event),
+        daemon=True,
+        name="auto-processor",
+    )
+    auto_thread.start()
+    logger.info("Auto-processor thread started")
+
     yield  # ── server is running ─────────────────────────────────────────────
 
-    logger.info("OD Assist shutting down")
+    # Graceful shutdown: signal the auto-processor to stop
+    logger.info("OD Assist shutting down — stopping auto-processor...")
+    stop_event.set()
+    auto_thread.join(timeout=5)
+    logger.info("OD Assist shutdown complete")
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
