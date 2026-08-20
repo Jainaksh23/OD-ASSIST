@@ -25,6 +25,8 @@ import os
 import shutil
 import threading
 import time
+import secrets
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -32,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import (BackgroundTasks, Depends, FastAPI, File, Form,
                      HTTPException, Request, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from groq import Groq
 from sentence_transformers import SentenceTransformer
@@ -61,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 TEMP_DIR = "temp_files"
 AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
-STUCK_THRESHOLD_HOURS = 1    # sources in "processing" longer than this → reset
+STUCK_THRESHOLD_MINUTES = 15 # sources in "processing" longer than this → mark failed
 
 
 # ── Auto-processor: picks up pending/stuck sources automatically ─────────────
@@ -77,20 +79,26 @@ def _auto_process_pending(embedder, groq_client, stop_event: threading.Event):
         try:
             db = SessionLocal()
 
-            # Reset stuck "processing" sources (> threshold hours old)
-            threshold = datetime.now(timezone.utc) - timedelta(hours=STUCK_THRESHOLD_HOURS)
+            # Safety-net: detect and fail stuck "processing" sources
+            # (crash recovery — sources abandoned by dead workers)
+            threshold = datetime.now(timezone.utc) - timedelta(minutes=STUCK_THRESHOLD_MINUTES)
             stuck = db.query(Source).filter(
                 Source.status == "processing",
-                Source.created_at < threshold,
+                Source.updated_at < threshold,
             ).all()
-            for s in stuck:
-                db.query(Chunk).filter(Chunk.source_id == s.id).delete()
-                s.status = "pending"
-                s.error_message = None
-                s.chunk_count = 0
-                logger.info("Auto-processor: reset stuck source ID:%d (%s)", s.id, s.title)
             if stuck:
+                for s in stuck:
+                    s.status = "failed"
+                    s.error_message = (
+                        f"Safety-net: source stuck in 'processing' for >{STUCK_THRESHOLD_MINUTES} min "
+                        f"(last updated: {s.updated_at}). Marked as failed for manual retry."
+                    )
+                    logger.warning(
+                        "Safety-net: marked stuck source ID:%d (%s) as 'failed'",
+                        s.id, s.title,
+                    )
                 db.commit()
+                logger.info("Safety-net: marked %d stuck sources as 'failed'", len(stuck))
 
             # Find pending sources
             pending = db.query(Source).filter(Source.status == "pending").all()
@@ -132,6 +140,19 @@ async def lifespan(app: FastAPI):
 
     init_db()
     logger.info("Database ready")
+
+    # Reset any stuck processing sources to failed
+    from db.db import SessionLocal
+    from db.models import Source
+    db = SessionLocal()
+    stuck = db.query(Source).filter(Source.status == "processing").all()
+    if stuck:
+        for s in stuck:
+            s.status = "failed"
+            s.error_message = "Processing interrupted by server shutdown/restart."
+        db.commit()
+        logger.info(f"Marked {len(stuck)} stuck 'processing' sources as 'failed'.")
+    db.close()
 
     # Embedding model — weights already baked into Docker image
     app.state.embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
@@ -183,6 +204,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def admin_basic_auth(request: Request, call_next):
+    path = request.url.path
+    
+    # Apply Basic Auth ONLY to the admin HTML/JS/CSS assets and the /admin redirect route.
+    # Exclude /admin/* API routes to avoid Authorization header clash with JWT Bearer tokens.
+    if path == "/admin" or path.startswith("/static/admin"):
+        auth_user = os.getenv("ADMIN_BASIC_AUTH_USER", "admin")
+        auth_pass = os.getenv("ADMIN_BASIC_AUTH_PASS", "adminpass")
+        
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return Response(
+                "Unauthorized", 
+                status_code=401, 
+                headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
+            )
+        try:
+            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            
+            # Secure string comparison
+            correct_username = secrets.compare_digest(username, auth_user)
+            correct_password = secrets.compare_digest(password, auth_pass)
+            
+            if not (correct_username and correct_password):
+                return Response(
+                    "Unauthorized", 
+                    status_code=401, 
+                    headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
+                )
+        except Exception:
+            return Response(
+                "Unauthorized", 
+                status_code=401, 
+                headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
+            )
+            
+    return await call_next(request)
 
 
 # ── Helpers to pull singletons from app.state ─────────────────────────────────
@@ -559,4 +620,5 @@ def admin_page():
 
 
 # Mount static LAST so API routes always take priority
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")

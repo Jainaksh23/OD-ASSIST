@@ -11,6 +11,8 @@ let token = sessionStorage.getItem('odAdminToken');
 let pollInterval = null;
 let pendingDeleteId = null;
 let modalAction    = null;   // 'delete' | 'retry-all'
+let currentSourceFilter = 'all';
+let cachedSources = [];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const loginScreen    = document.getElementById('login-screen');
@@ -163,6 +165,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+// ── Filter switching ──────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.remove('active'); b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active'); btn.setAttribute('aria-selected', 'true');
+    currentSourceFilter = btn.dataset.filter;
+    if (cachedSources) {
+      renderSources(cachedSources);
+    }
+  });
+});
+
 // ── Dropzone ──────────────────────────────────────────────────────────────────
 dropzone.addEventListener('click', () => pdfFileInput.click());
 dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') pdfFileInput.click(); });
@@ -303,6 +319,7 @@ async function fetchSources() {
     if (res.status === 401) { handleExpiredToken(); return; }
     if (!res.ok) return;
     const sources = await res.json();
+    cachedSources = sources;
     renderSources(sources);
   } catch { /* silent on poll errors */ }
 }
@@ -328,7 +345,14 @@ function renderSources(sources) {
     retryAllBtn.classList.add('hidden');
   }
 
-  if (!sources || sources.length === 0) {
+  const filteredSources = currentSourceFilter === 'all' 
+    ? sources 
+    : sources.filter(s => s.status === currentSourceFilter);
+
+  if (!filteredSources || filteredSources.length === 0) {
+    sourcesEmpty.textContent = currentSourceFilter === 'all' 
+      ? 'No sources yet. Add one above.' 
+      : 'No sources in this category.';
     sourcesEmpty.classList.remove('hidden');
     sourcesGrid.classList.add('hidden');
     sidebarSources.innerHTML = '';
@@ -340,7 +364,7 @@ function renderSources(sources) {
   sourcesGrid.innerHTML = '';
   sidebarSources.innerHTML = '';
 
-  sources.forEach(s => {
+  filteredSources.forEach(s => {
     const date = s.created_at ? new Date(s.created_at).toLocaleString() : '—';
     const typeLabel = { pdf:'PDF', drive_doc:'Drive Doc', drive_video:'Drive Video', raw_text:'Raw Text' }[s.source_type] || s.source_type;
     const stClass   = { processing:'processing', completed:'completed', failed:'failed' }[s.status] || '';
@@ -376,6 +400,22 @@ function renderSources(sources) {
       </div>
     `;
     sourcesGrid.appendChild(card);
+
+    // 3D Tilt Effect
+    card.addEventListener('mousemove', (e) => {
+      if (window.innerWidth <= 768) return;
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = ((y - centerY) / centerY) * -4;
+      const rotateY = ((x - centerX) / centerX) * 4;
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+    });
   });
 
   // Wire delete buttons
@@ -582,6 +622,20 @@ if (createUserForm) {
       toast('Connection error', 'error');
     } finally {
       setLoading(userSubmit, userBtnLabel, userSpinner, false, 'Create User');
+    }
+  });
+}
+
+// ── Mobile Menu Toggle ────────────────────────────────────────────────────────
+const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+const sidebar = document.querySelector('.sidebar');
+if (mobileMenuBtn && sidebar) {
+  mobileMenuBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && e.target !== mobileMenuBtn) {
+      sidebar.classList.remove('open');
     }
   });
 }

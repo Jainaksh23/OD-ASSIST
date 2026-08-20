@@ -6,7 +6,7 @@
   <title>OD Assist — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/admin.css" />
 </head>
 <body>
@@ -15,7 +15,7 @@
   <div id="login-screen" class="screen">
     <div class="login-card">
       <div class="login-logo">
-        <span>⚡</span> OD Assist <span class="badge">Admin</span>
+        <span class="icon-badge">⚡</span> OD Assist <span class="badge">Admin</span>
       </div>
       <p class="login-sub">Sign in to manage knowledge sources</p>
 
@@ -43,7 +43,7 @@
     
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <span>⚡</span> OD Assist <span class="badge">Admin</span>
+        <span class="icon-badge">⚡</span> OD Assist <span class="badge">Admin</span>
       </div>
       
       <div class="sidebar-stats">
@@ -65,7 +65,10 @@
 
     <main class="main-content">
       <header class="main-header">
-        <h2>Manage Knowledge</h2>
+        <div class="header-left">
+          <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open menu">☰</button>
+          <h2>Manage Knowledge</h2>
+        </div>
         <div class="header-actions">
           <span id="topbar-user" class="user-chip">odadmin</span>
           <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
@@ -164,6 +167,12 @@
               🔄 Retry All Failed (<span id="retry-all-count">0</span>)
             </button>
           </div>
+          <nav class="tab-nav status-filters" style="margin-bottom: 1rem; justify-content: flex-start; gap: 0.5rem; overflow-x: auto;">
+            <button class="tab-btn active filter-btn" data-filter="all">All</button>
+            <button class="tab-btn filter-btn" data-filter="completed">Ready</button>
+            <button class="tab-btn filter-btn" data-filter="processing">Processing</button>
+            <button class="tab-btn filter-btn" data-filter="failed">Needs Retry</button>
+          </nav>
           <div id="sources-loading" class="placeholder-state">Loading sources…</div>
           <div id="sources-empty" class="placeholder-state hidden">No sources yet. Add one above.</div>
           

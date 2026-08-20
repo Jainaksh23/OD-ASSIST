@@ -19,42 +19,81 @@ def _gdown_download(**kwargs):
     DownloadError instead of returning None on failure — normalize both
     behaviors to a single raised Exception.
     """
-    try:
-        import sys
-        import re
-        import importlib
+    import sys
+    import re
+    import importlib
+    import time
+    import requests
 
-        # Eagerly ensure gdown.download is imported so the monkey-patch
-        # always applies — even on the very first call in the process.
-        if 'gdown.download' not in sys.modules:
-            importlib.import_module('gdown.download')
+    # Eagerly ensure gdown.download is imported so the monkey-patch
+    # always applies — even on the very first call in the process.
+    if 'gdown.download' not in sys.modules:
+        importlib.import_module('gdown.download')
 
-        # Monkey patch osp.join inside gdown.download module to sanitize destination filenames
-        # This prevents WinError 87 on Windows when Drive filenames contain colons or other invalid chars.
-        download_mod = sys.modules.get('gdown.download')
-        if download_mod and not hasattr(download_mod, '_original_osp_join'):
-            download_mod._original_osp_join = download_mod.osp.join
+    # Monkey patch osp.join inside gdown.download module to sanitize destination filenames
+    # This prevents WinError 87 on Windows when Drive filenames contain colons or other invalid chars.
+    download_mod = sys.modules.get('gdown.download')
+    if download_mod and not hasattr(download_mod, '_original_osp_join'):
+        download_mod._original_osp_join = download_mod.osp.join
+        
+        def safe_join(path, *paths):
+            sanitized_paths = []
+            for p in paths:
+                if isinstance(p, str):
+                    p = re.sub(r'[<>:"/\\|?*]', '_', p).replace('\ufffd', '_')
+                sanitized_paths.append(p)
+            return download_mod._original_osp_join(path, *sanitized_paths)
             
-            def safe_join(path, *paths):
-                sanitized_paths = []
-                for p in paths:
-                    if isinstance(p, str):
-                        p = re.sub(r'[<>:"/\\|?*]', '_', p).replace('\ufffd', '_')
-                    sanitized_paths.append(p)
-                return download_mod._original_osp_join(path, *sanitized_paths)
-                
-            download_mod.osp.join = safe_join
+        download_mod.osp.join = safe_join
 
+    max_retries = 3
+    backoff = 3
+    
+    for attempt in range(max_retries + 1):
         try:
-            return gdown.download(**kwargs)
-        except TypeError as e:
-            if "fuzzy" in str(e):
-                kwargs.pop("fuzzy", None)
+            try:
                 return gdown.download(**kwargs)
-            raise
-    except Exception as e:
-        # covers gdown.exceptions.DownloadError / FileURLRetrievalError (6.x)
-        raise Exception(f"gdown download failed: {e}") from e
+            except TypeError as e:
+                if "fuzzy" in str(e):
+                    kwargs_copy = dict(kwargs)
+                    kwargs_copy.pop("fuzzy", None)
+                    return gdown.download(**kwargs_copy)
+                raise
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Identify if it's a transient network error
+            is_network_error = (
+                "ssleoferror" in error_msg 
+                or "sslerror" in error_msg
+                or "max retries exceeded" in error_msg
+                or "connectionerror" in error_msg
+                or "read timed out" in error_msg
+                or "connection reset" in error_msg
+                or getattr(requests.exceptions, "ConnectionError", None) and isinstance(e, (
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.SSLError
+                ))
+            )
+            
+            # Permission/Access issues should fail immediately without retry.
+            # Note: gdown often prefixes generic errors with "failed to retrieve", 
+            # so we only treat it as an Access Denied if it isn't a network error.
+            is_permission_error = any(err in error_msg for err in ["access denied", "permission", "403", "forbidden"])
+            if is_permission_error or (not is_network_error and "failed to retrieve" in error_msg):
+                raise Exception("Access Denied") from e
+            
+            if is_network_error:
+                if attempt < max_retries:
+                    print(f"Network error encountered. Retrying in {backoff} seconds... (Attempt {attempt + 1}/{max_retries})")
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                else:
+                    raise Exception(f"Network issue after {max_retries} retries: {e}") from e
+                    
+            raise Exception(f"gdown download failed: {e}") from e
 
 
 def fetch_from_drive(url: str, output_dir: str) -> tuple[str, str]:

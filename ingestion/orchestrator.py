@@ -46,8 +46,15 @@ def process_source(
 
         source.status = "processing"
         db.commit()
+        
+        # Save attributes needed for extraction
+        source_type = source.source_type
+        source_url = source.source_url
+        
+        # Close DB connection during long-running tasks to prevent SSL connection timeout
+        db.close()
 
-        extracted_text = _extract_text(source, groq_client)
+        extracted_text = _extract_text(source_type, source_url, groq_client)
         if not extracted_text or not extracted_text.strip():
             raise ValueError("No readable text extracted from source.")
 
@@ -72,7 +79,7 @@ def process_source(
         def _enrich_worker(index, text):
             return index, enrich_chunk(text, groq_client)
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
                 executor.submit(_enrich_worker, i, chunk)
                 for i, chunk in enumerate(chunks_text)
@@ -80,6 +87,12 @@ def process_source(
             for future in as_completed(futures):
                 idx, summary = future.result()
                 summaries[idx] = summary
+
+        # Re-open DB session to save chunks
+        db = SessionLocal()
+        source = db.get(Source, source_id)
+        if not source:
+            raise ValueError(f"Source {source_id} not found after processing.")
 
         for i, text_chunk in enumerate(chunks_text):
             db_chunks.append(
@@ -101,6 +114,8 @@ def process_source(
     except Exception as exc:
         logger.exception("process_source failed for source_id=%d", source_id)
         try:
+            # Ensure we have a valid session to write the error
+            db = SessionLocal()
             source = db.get(Source, source_id)
             if source:
                 source.status = "failed"
@@ -109,25 +124,28 @@ def process_source(
         except Exception:
             db.rollback()
     finally:
-        db.close()
+        try:
+            db.close()
+        except:
+            pass
         _cleanup(temp_file_to_clean)
 
 
-def _extract_text(source: Source, groq_client) -> str:
+def _extract_text(source_type: str, source_url: str, groq_client) -> str:
     """Route extraction based on source_type."""
-    if source.source_type == "raw_text":
+    if source_type == "raw_text":
         # raw_text sources: text was stored in source_url field at ingest time
-        return source.source_url or ""
+        return source_url or ""
 
-    if source.source_type == "pdf":
-        return extract_text_from_pdf(source.source_url)
+    if source_type == "pdf":
+        return extract_text_from_pdf(source_url)
 
-    if source.source_type in ("drive_doc", "drive_video"):
+    if source_type in ("drive_doc", "drive_video"):
         os.makedirs(TEMP_DIR, exist_ok=True)
-        local_path, detected_type = fetch_from_drive(source.source_url, TEMP_DIR)
+        local_path, detected_type = fetch_from_drive(source_url, TEMP_DIR)
         try:
             # Respect user-specified type; fall back to auto-detected
-            resolved_type = source.source_type if source.source_type != "drive_doc" else detected_type
+            resolved_type = source_type if source_type != "drive_doc" else detected_type
             if resolved_type == "drive_video":
                 return extract_and_transcribe_video(local_path, groq_client)
             else:
@@ -144,7 +162,7 @@ def _extract_text(source: Source, groq_client) -> str:
                 except OSError:
                     pass
 
-    raise ValueError(f"Unknown source_type: {source.source_type!r}")
+    raise ValueError(f"Unknown source_type: {source_type!r}")
 
 
 def _cleanup(path):
