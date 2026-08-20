@@ -213,7 +213,7 @@ async def admin_basic_auth(request: Request, call_next):
     # Exclude /admin/* API routes to avoid Authorization header clash with JWT Bearer tokens.
     if path == "/admin" or path.startswith("/static/admin"):
         auth_user = os.getenv("ADMIN_BASIC_AUTH_USER", "admin")
-        auth_pass = os.getenv("ADMIN_BASIC_AUTH_PASS", "adminpass")
+        auth_pass = os.getenv("ADMIN_BASIC_AUTH_PASS", "Admin@OkieDokie2026")
         
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Basic "):
