@@ -1,13 +1,3 @@
----
-title: OD Assist
-emoji: ⚡
-colorFrom: yellow
-colorTo: orange
-sdk: docker
-pinned: false
-app_port: 7860
----
-
 # OD Assist
 
 A RAG (Retrieval-Augmented Generation) chatbot for Okie Dokie organizational knowledge.
@@ -64,9 +54,11 @@ uvicorn api.main:app --reload --port 7860
 - Go to `http://localhost:7860/`, ask a question as a user, and verify you get an answer with citations.
 **Do not deploy to Hugging Face Spaces until this local end-to-end test passes.**
 
-### 8. Deploy to Hugging Face Spaces
-Push the repository to an HF Space using the Docker SDK.
-- Navigate to your Space **Settings > Secrets**.
-- Add the following secrets: `DATABASE_URL`, `GROQ_API_KEY`, `JWT_SECRET`, `ADMIN_PASSWORD`. (Never hardcode these in code).
-- Allow the initial build time to complete (it bakes the embedding weights into the image to avoid cold starts).
-- Finally, test the live URL to ensure admin ingestion and user chat function normally.
+### 8. Deploy to Render (Free Tier)
+This project is fully compatible with Render's free Web Services (Docker environment).
+- Push this code to a GitHub repository.
+- Go to [render.com](https://dashboard.render.com/web/new) and create a new **Web Service**.
+- Connect your GitHub repository and ensure the **Environment** is set to Docker.
+- Select the **Free** instance type ($0/month).
+- In the **Environment Variables** section, add your secrets: `DATABASE_URL`, `GROQ_API_KEY`, `JWT_SECRET`, `ADMIN_PASSWORD`. (Also add `ADMIN_BASIC_AUTH_USER` and `ADMIN_BASIC_AUTH_PASS` if required).
+- Click **Create Web Service**. Render will automatically build the Docker image and deploy your app.
