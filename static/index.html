@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Okie Dokie Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/design-tokens.css" />
+  <style>
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
+    .landing-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 0%, var(--primary-soft), transparent 60%), var(--bg-color);
+      z-index: 0;
+    }
+    .login-bg-shape {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--border-color) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.5;
+      mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+      z-index: 0;
+    }
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 640px;
+      width: 90%;
+    }
+    .logo-badge {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: inline-block;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+      100% { transform: translateY(0px); }
+    }
+    h1 {
+      font-family: var(--font-heading);
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+      font-size: 1.1rem;
+    }
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 600px) {
+      .options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .portal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 2.5rem 1.5rem;
+      text-decoration: none;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .portal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: var(--primary-gradient);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .portal-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-3d-hover);
+      border-color: var(--primary-accent);
+    }
+    .portal-card:hover::before {
+      opacity: 1;
+    }
+    .icon-wrapper {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      color: var(--primary-accent);
+      transition: transform 0.3s;
+    }
+    .portal-card:hover .icon-wrapper {
+      transform: scale(1.1) rotate(5deg);
+    }
+    .portal-card h2 {
+      font-family: var(--font-heading);
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .portal-card p {
+      margin-bottom: 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .btn-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--primary-soft);
+      color: var(--primary-accent);
+      margin-top: 1.5rem;
+      border: 1px solid rgba(194, 65, 12, 0.2);
+    }
+    
+    [data-theme="dark"] .landing-bg {
+      background: radial-gradient(circle at 50% 0%, rgba(194, 65, 12, 0.15), transparent 60%), var(--bg-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="landing-bg"></div>
+  <div class="login-bg-shape"></div>
+  
+  <div class="container">
+    <div class="logo-badge">⚡</div>
+    <h1>Okie Dokie Portal</h1>
+    <p class="subtitle">Please select a portal to continue</p>
+    
+    <div class="options-grid">
+      <a href="/static/user.html" class="portal-card">
+        <div class="icon-wrapper">🎓</div>
+        <h2>User Portal</h2>
+        <p>Access the knowledge assistant and ask questions about policies.</p>
+        <span class="btn-badge">For Students & Staff</span>
+      </a>
+      
+      <a href="/admin" class="portal-card">
+        <div class="icon-wrapper">⚙️</div>
+        <h2>Admin Portal</h2>
+        <p>Manage documents, ingest data, and control system settings.</p>
+        <span class="btn-badge">Official Admin Only</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // Inherit theme from localStorage if set
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+</body>
+</html>

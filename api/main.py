@@ -611,7 +611,7 @@ def submit_feedback(
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/static/user.html")
+    return RedirectResponse(url="/static/index.html")
 
 
 @app.get("/admin", include_in_schema=False)
