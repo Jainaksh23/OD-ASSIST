@@ -25,8 +25,6 @@ import os
 import shutil
 import threading
 import time
-import secrets
-import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -204,46 +202,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.middleware("http")
-async def admin_basic_auth(request: Request, call_next):
-    path = request.url.path
-    
-    # Apply Basic Auth ONLY to the admin HTML/JS/CSS assets and the /admin redirect route.
-    # Exclude /admin/* API routes to avoid Authorization header clash with JWT Bearer tokens.
-    if path == "/admin" or path.startswith("/static/admin"):
-        auth_user = os.getenv("ADMIN_BASIC_AUTH_USER", "admin")
-        auth_pass = os.getenv("ADMIN_BASIC_AUTH_PASS", "Admin@OkieDokie2026")
-        
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Basic "):
-            return Response(
-                "Unauthorized", 
-                status_code=401, 
-                headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
-            )
-        try:
-            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
-            username, password = decoded.split(":", 1)
-            
-            # Secure string comparison
-            correct_username = secrets.compare_digest(username, auth_user)
-            correct_password = secrets.compare_digest(password, auth_pass)
-            
-            if not (correct_username and correct_password):
-                return Response(
-                    "Unauthorized", 
-                    status_code=401, 
-                    headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
-                )
-        except Exception:
-            return Response(
-                "Unauthorized", 
-                status_code=401, 
-                headers={"WWW-Authenticate": 'Basic realm="Admin Panel Secure Access"'}
-            )
-            
-    return await call_next(request)
 
 
 # ── Helpers to pull singletons from app.state ─────────────────────────────────
