@@ -29,7 +29,7 @@ OD Assist is built for speed, accuracy, and ease of deployment.
 
 ### AI & Machine Learning
 * **Embeddings**: `sentence-transformers` (`BAAI/bge-small-en-v1.5`) — Runs locally for fast, cost-effective document chunk vectorization.
-* **LLM Engine**: [Groq API](https://groq.com/) (`llama-3.3-70b-versatile`) — Provides blazing-fast inference for answer generation.
+* **LLM Engine**: [Groq API](https://groq.com/) (`openai/gpt-oss-120b`) — Provides blazing-fast inference for answer generation.
 * **Audio Transcription**: Groq Whisper API (`whisper-large-v3`) — Automatically extracts and transcribes audio from Google Drive video links.
 * **Search Engine**: **Hybrid Search** — Combines dense Vector Search with sparse Keyword Search (BM25) to ensure the highest retrieval accuracy.
 

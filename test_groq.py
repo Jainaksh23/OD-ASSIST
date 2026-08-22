@@ -24,7 +24,7 @@ else:
         # Test Chat Completion
         print("Testing Chat Completion...")
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": "Hello!"}]
         )
         print("Chat Completion SUCCESS:", completion.choices[0].message.content)
