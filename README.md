@@ -25,6 +25,7 @@ OD Assist is built for speed, accuracy, and ease of deployment.
 * **Database**: [PostgreSQL (Neon Serverless)](https://neon.tech/) — Cloud-native Postgres.
 * **Vector Store**: `pgvector` extension for efficient cosine-similarity search.
 * **ORM**: SQLAlchemy.
+* **Semantic Query Cache**: Store and match query-answer pairs using vector similarity to bypass the LLM for repeated queries, providing sub-100ms responses.
 
 ### AI & Machine Learning
 * **Embeddings**: `sentence-transformers` (`BAAI/bge-small-en-v1.5`) — Runs locally for fast, cost-effective document chunk vectorization.
@@ -32,9 +33,15 @@ OD Assist is built for speed, accuracy, and ease of deployment.
 * **Audio Transcription**: Groq Whisper API (`whisper-large-v3`) — Automatically extracts and transcribes audio from Google Drive video links.
 * **Search Engine**: **Hybrid Search** — Combines dense Vector Search with sparse Keyword Search (BM25) to ensure the highest retrieval accuracy.
 
-### Frontend
+### Frontend & Admin Dashboard
 * **UI**: Vanilla HTML, CSS (Design Tokens, CSS Variables), and JavaScript.
-* **Design**: Fully responsive, glassmorphism aesthetics, integrated Dark/Light modes, and separate, secure portals for Users and Admins.
+* **Design**: Fully responsive, glassmorphism aesthetics, integrated Dark/Light modes.
+* **Tabbed Admin Panel**: Easy sidebar-based navigation between:
+  - **Dashboard**: High-level metrics, query count trends, feedback analysis, and citation statistics.
+  - **Knowledge Base**: PDF uploads, Google Drive/Folder ingestions, text snippets, and source status tracker.
+  - **Users**: Admin user management.
+  - **Feedbacks**: Detailed log of user upvotes/downvotes and specific user feedback.
+  - **Semantic Cache**: Real-time stats (hit rate, average response times), cached items list with hit counters, and manual cache flushing.
 
 ---
 
@@ -47,9 +54,13 @@ OD Assist is built for speed, accuracy, and ease of deployment.
    - The text is chunked into manageable pieces (with overlap to preserve context).
    - The embedding model converts these chunks into dense vector representations.
    - Vectors and metadata are stored in the Neon PostgreSQL database.
-3. **Retrieval & Generation (User Portal)**:
-   - A user asks a question in the chat interface.
-   - The query is vectorized. The system performs a hybrid search to find the top most relevant chunks from the database.
+3. **Semantic Cache Lookup**:
+   - When a user asks a question, the query is vectorized and compared against cached queries in the database using `pgvector` similarity search.
+   - **Cache Hit**: If a highly similar query (default threshold: 95%) is found and is within the TTL (default: 48 hours), the system retrieves the answer instantly from the cache (~50-100ms response time), bypassing the LLM entirely.
+   - **Cache Miss**: If no match is found, the system proceeds with Retrieval & Generation, then stores the new query, response, source metadata, and embedding into the cache for future hits.
+   - **Auto-Flush**: Ingesting a new source automatically flushes the cache to ensure subsequent answers reflect the latest documents.
+4. **Retrieval & Generation (On Cache Miss)**:
+   - The system performs a hybrid search to find the top most relevant chunks from the database.
    - The LLM (Llama 3 via Groq) receives the user's question alongside the retrieved context chunks and generates a precise answer.
    - The UI displays the answer, a confidence score, and clickable source citations.
 
@@ -75,6 +86,10 @@ JWT_SECRET=generate_a_random_secure_string
 ADMIN_PASSWORD=YourSecurePassword123
 ADMIN_BASIC_AUTH_USER=admin
 ADMIN_BASIC_AUTH_PASS=YourSecureAdminAuthPass
+
+# Optional Semantic Cache Configuration
+CACHE_SIMILARITY_THRESHOLD=0.95
+CACHE_TTL_HOURS=48
 ```
 
 ### 4. Install Dependencies
