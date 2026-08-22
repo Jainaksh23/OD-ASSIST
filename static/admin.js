@@ -1067,6 +1067,19 @@ function switchView(viewName) {
     targetPanel.classList.remove('hidden');
   }
   
+  // Update header title dynamically
+  const headerMap = {
+    'knowledge': 'Manage Knowledge Base',
+    'analytics': 'Analytics Dashboard',
+    'insights': 'Insights & Gaps',
+    'users': 'Manage Users',
+    'cache': 'Semantic Cache'
+  };
+  const headerTitle = document.getElementById('page-header-title');
+  if (headerTitle && headerMap[viewName]) {
+    headerTitle.textContent = headerMap[viewName];
+  }
+  
   // Update active state on nav buttons
   navButtons.forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {

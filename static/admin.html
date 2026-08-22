@@ -77,7 +77,7 @@
       <header class="main-header">
         <div class="header-left">
           <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open menu">☰</button>
-          <h2>Manage Knowledge</h2>
+          <h2 id="page-header-title">Manage Knowledge</h2>
         </div>
         <div class="header-actions">
           <span id="topbar-user" class="user-chip">odadmin</span>
@@ -322,27 +322,27 @@
           
           <!-- Top Stat Cards -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+            <div class="stat-box">
               <div class="stat-value" id="analytics-total">0</div>
               <div class="stat-label">Total Queries</div>
             </div>
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+            <div class="stat-box">
               <div class="stat-value" id="analytics-today">0</div>
               <div class="stat-label">Queries Today</div>
             </div>
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+            <div class="stat-box">
               <div class="stat-value" id="analytics-week">0</div>
               <div class="stat-label">Queries This Week</div>
             </div>
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+            <div class="stat-box">
               <div class="stat-value" id="analytics-conf">0%</div>
               <div class="stat-label">High Confidence</div>
             </div>
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border); border-left: 3px solid #4caf50;">
+            <div class="stat-box" style="border-left: 3px solid #4caf50;">
               <div class="stat-value" id="analytics-cache-rate" style="color: #4caf50;">0%</div>
               <div class="stat-label">Cache Hit Rate</div>
             </div>
-            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border); border-left: 3px solid #42a5f5;">
+            <div class="stat-box" style="border-left: 3px solid #42a5f5;">
               <div class="stat-value" id="analytics-cache-time" style="font-size: 0.95rem; color: #42a5f5;">—</div>
               <div class="stat-label">Avg Response Time</div>
             </div>
@@ -351,28 +351,32 @@
           <!-- Charts Row 1 -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
             <!-- Usage Trend -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Usage Trend (Last 14 Days)</h4>
-              <canvas id="usageChart" height="200"></canvas>
+              <div style="position: relative; height: 220px; width: 100%;">
+                <canvas id="usageChart"></canvas>
+              </div>
             </div>
             <!-- Peak Usage Time -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Peak Usage Time (Hours)</h4>
-              <canvas id="peakTimeChart" height="200"></canvas>
+              <div style="position: relative; height: 220px; width: 100%;">
+                <canvas id="peakTimeChart"></canvas>
+              </div>
             </div>
           </div>
 
           <!-- Charts Row 2 -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
             <!-- Confidence Distribution -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Confidence Distribution</h4>
-              <div style="max-height: 250px; display: flex; justify-content: center;">
+              <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
                 <canvas id="confidenceChart"></canvas>
               </div>
             </div>
             <!-- Feedback Stats -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Feedback Stats</h4>
               <div style="margin-bottom: 1rem;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
@@ -394,14 +398,14 @@
           <!-- Lists Row -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
             <!-- Top Questions -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Top 10 Questions</h4>
               <ul id="top-questions-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.5rem;">
                 <!-- Injected via JS -->
               </ul>
             </div>
             <!-- Most Cited Sources -->
-            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+            <div class="card" style="margin-bottom: 0; padding: 1.5rem;">
               <h4 style="margin-bottom: 1rem; font-size: 1rem;">Most Cited Sources</h4>
               <ul id="most-cited-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.5rem;">
                 <!-- Injected via JS -->
