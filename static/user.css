@@ -264,8 +264,8 @@ body {
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
   background: var(--bg-color);
@@ -559,9 +559,10 @@ body {
   border: 1px solid var(--border-color);
   background: transparent;
   border-radius: 8px;
-  padding: 0.25rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 44px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   transition: background 0.15s, transform 0.1s;
 }
 
@@ -689,8 +690,8 @@ body {
 }
 
 .circle-btn {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: var(--primary-gradient);
@@ -736,41 +737,6 @@ body {
 #messages::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 999px;
-}
-
-/* ---------- Responsive ---------- */
-@media (max-width: 560px) {
-  .chat-header {
-    padding: 0.7rem 1rem;
-  }
-
-  .header-info .tagline {
-    display: none;
-  }
-
-  #messages {
-    padding: 1rem 0.85rem 0.5rem;
-  }
-
-  .message {
-    max-width: 92%;
-  }
-
-  .suggestion-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .empty-state h2 {
-    font-size: 1.2rem;
-  }
-
-  .input-bar {
-    padding: 0.7rem 0.85rem 0.85rem;
-  }
-
-  .input-hint {
-    display: none;
-  }
 }
 
 /* ---------- Reduced motion ---------- */
@@ -927,4 +893,82 @@ body {
   align-items: center;
   justify-content: center;
   user-select: none;
+}
+
+/* ---------- Comprehensive Responsive Layout ---------- */
+@media (max-width: 768px) {
+  .system-paths-container {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .chat-header {
+    padding: 0.7rem 1rem;
+  }
+
+  .header-info .tagline {
+    display: none;
+  }
+  
+  .badge {
+    display: none !important;
+  }
+
+  #messages {
+    padding: 1rem 0.85rem 0.5rem;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .empty-state h2 {
+    font-size: 1.2rem;
+  }
+
+  .input-bar {
+    padding: 0.75rem 0.85rem 0.85rem;
+  }
+
+  .input-hint {
+    display: none;
+  }
+  
+  /* System Paths Mobile Stacking */
+  .system-path-flow {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .system-path-arrow {
+    transform: rotate(90deg);
+    margin: 0.25rem 0;
+  }
+
+  .system-path-step-box {
+    width: 100%;
+    max-width: 280px;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 2rem 1.5rem;
+    border-radius: 16px;
+  }
+  
+  .message {
+    max-width: 95%;
+  }
+  
+  .chat-header h1 {
+    font-size: 1rem;
+  }
 }

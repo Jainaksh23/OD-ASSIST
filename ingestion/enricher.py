@@ -1,4 +1,5 @@
 from groq import Groq
+from generation.generator import strip_thinking
 
 def enrich_chunk(chunk_text: str, client: Groq) -> str:
     """
@@ -15,7 +16,8 @@ def enrich_chunk(chunk_text: str, client: Groq) -> str:
             temperature=0.0,
             max_tokens=50
         )
-        summary = response.choices[0].message.content.strip()
+        raw_summary = response.choices[0].message.content.strip()
+        summary = strip_thinking(raw_summary)
         return summary
     except Exception as e:
         print(f"Error enriching chunk: {e}")

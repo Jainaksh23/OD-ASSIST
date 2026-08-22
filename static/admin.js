@@ -816,13 +816,36 @@ if (clearCacheBtn) {
 // ── Mobile Menu Toggle ────────────────────────────────────────────────────────
 const mobileMenuBtn = document.getElementById('mobile-menu-btn');
 const sidebar = document.querySelector('.sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+function openSidebar() {
+  if (sidebar) sidebar.classList.add('open');
+  if (sidebarOverlay) sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+  if (sidebar) sidebar.classList.remove('open');
+  if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+}
+
 if (mobileMenuBtn && sidebar) {
   mobileMenuBtn.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
+    if (sidebar.classList.contains('open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
   });
+
+  // Close sidebar when overlay is tapped
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+  }
+
+  // Close sidebar on outside click
   document.addEventListener('click', (e) => {
-    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && e.target !== mobileMenuBtn) {
-      sidebar.classList.remove('open');
+    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && e.target !== mobileMenuBtn && e.target !== sidebarOverlay) {
+      closeSidebar();
     }
   });
 }
@@ -1124,9 +1147,8 @@ navButtons.forEach(btn => {
     switchView(viewName);
     
     // Close mobile menu if open
-    const sidebarEl = document.querySelector('.sidebar');
-    if (sidebarEl && window.innerWidth <= 768) {
-      sidebarEl.classList.remove('open');
+    if (window.innerWidth <= 768) {
+      closeSidebar();
     }
   });
 });
