@@ -27,7 +27,7 @@ import threading
 import time
 import re
 from typing import List, Dict, Optional, Any, Union, Tuple
-from sqlalchemy import func
+from sqlalchemy import func, text
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
