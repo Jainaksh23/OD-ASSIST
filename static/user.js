@@ -249,6 +249,34 @@ function appendAssistantMessage(data) {
         }
         
         bubbleEl.innerHTML += extras;
+
+        // Render System Paths if present
+        if (data.system_paths && data.system_paths.length > 0) {
+            const pathsContainer = document.createElement("div");
+            pathsContainer.className = "system-paths-container";
+            
+            data.system_paths.forEach(path => {
+                const pathCard = document.createElement("div");
+                pathCard.className = "system-path-card";
+                
+                const stepsHtml = path.steps.map(step => `
+                    <div class="system-path-step-box">
+                        ${escapeHTML(step)}
+                    </div>
+                `).join('<div class="system-path-arrow">→</div>');
+                
+                pathCard.innerHTML = `
+                    <div class="system-path-card-title">${escapeHTML(path.title)}</div>
+                    ${path.description ? `<div class="system-path-card-desc">${escapeHTML(path.description)}</div>` : ''}
+                    <div class="system-path-flow">
+                        ${stepsHtml}
+                    </div>
+                `;
+                pathsContainer.appendChild(pathCard);
+            });
+            msgDiv.appendChild(pathsContainer);
+        }
+
         scrollToBottom();
     });
 }

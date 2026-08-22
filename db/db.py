@@ -60,6 +60,72 @@ def init_db():
             ))
         conn.commit()
 
+    # Seed default system paths
+    db = SessionLocal()
+    try:
+        seed_default_system_paths(db)
+    except Exception as e:
+        print(f"Error seeding system paths: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+def seed_default_system_paths(db):
+    from db.models import SystemPath, SystemPathStep, Source
+    
+    # Check if paths already exist to prevent duplicate seeding
+    student_path = db.query(SystemPath).filter(SystemPath.title == "Student List Navigation").first()
+    if not student_path:
+        student_path = SystemPath(
+            title="Student List Navigation",
+            description="Navigation flow to view student details from the student list"
+        )
+        db.add(student_path)
+        db.flush()
+        
+        # Add steps: Student List -> Select Student -> Detail
+        labels = ["Student List", "Select Student", "Detail"]
+        for idx, label in enumerate(labels):
+            step = SystemPathStep(
+                system_path_id=student_path.id,
+                step_label=label,
+                step_order=idx + 1
+            )
+            db.add(step)
+            
+        # Try to link to a relevant student/admission source
+        admission_source = db.query(Source).filter(Source.title.ilike("%admission%")).first()
+        if admission_source:
+            student_path.sources.append(admission_source)
+        db.commit()
+        print("Seeded System Path: Student List Navigation")
+
+    assign_route_path = db.query(SystemPath).filter(SystemPath.title == "Assign Route").first()
+    if not assign_route_path:
+        assign_route_path = SystemPath(
+            title="Assign Route",
+            description="Navigation flow to assign a transport route to a student"
+        )
+        db.add(assign_route_path)
+        db.flush()
+        
+        # Add steps: Route List -> Assign Route -> Select Student -> Confirm
+        labels = ["Route List", "Assign Route", "Select Student", "Confirm"]
+        for idx, label in enumerate(labels):
+            step = SystemPathStep(
+                system_path_id=assign_route_path.id,
+                step_label=label,
+                step_order=idx + 1
+            )
+            db.add(step)
+            
+        # Link to Transport Setup source
+        transport_source = db.query(Source).filter(Source.title.ilike("%transport%")).first()
+        if transport_source:
+            assign_route_path.sources.append(transport_source)
+        db.commit()
+        print("Seeded System Path: Assign Route")
+
 def get_db():
     db = SessionLocal()
     try:

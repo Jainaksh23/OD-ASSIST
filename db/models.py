@@ -3,7 +3,7 @@ models.py — SQLAlchemy ORM models for OD Assist.
 Tables: users, sources, chunks (pgvector), query_logs, query_cache
 """
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, TIMESTAMP
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, TIMESTAMP, Table
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -48,6 +48,7 @@ class Source(Base):
         "Chunk", back_populates="source",
         cascade="all, delete-orphan", lazy="select"
     )
+    system_paths = relationship("SystemPath", secondary="system_path_sources", back_populates="sources")
 
 
 class Chunk(Base):
@@ -101,3 +102,35 @@ class QueryCache(Base):
     hit_count = Column(Integer, default=0)
     last_hit_at = Column(TIMESTAMP(timezone=True))
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+
+# Association table for many-to-many relationship between SystemPath and Source
+system_path_sources = Table(
+    "system_path_sources",
+    Base.metadata,
+    Column("system_path_id", Integer, ForeignKey("system_paths.id", ondelete="CASCADE"), primary_key=True),
+    Column("source_id", Integer, ForeignKey("sources.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class SystemPath(Base):
+    __tablename__ = "system_paths"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(Text, nullable=False)
+    description = Column(Text)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    steps = relationship("SystemPathStep", back_populates="system_path", cascade="all, delete-orphan")
+    sources = relationship("Source", secondary=system_path_sources, back_populates="system_paths")
+
+
+class SystemPathStep(Base):
+    __tablename__ = "system_path_steps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    system_path_id = Column(Integer, ForeignKey("system_paths.id", ondelete="CASCADE"), nullable=False)
+    step_label = Column(Text, nullable=False)
+    step_order = Column(Integer, nullable=False)
+
+    system_path = relationship("SystemPath", back_populates="steps")

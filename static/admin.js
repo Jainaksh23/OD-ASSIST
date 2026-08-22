@@ -1073,7 +1073,8 @@ function switchView(viewName) {
     'analytics': 'Analytics Dashboard',
     'insights': 'Insights & Gaps',
     'users': 'Manage Users',
-    'cache': 'Semantic Cache'
+    'cache': 'Semantic Cache',
+    'paths': 'System Paths'
   };
   const headerTitle = document.getElementById('page-header-title');
   if (headerTitle && headerMap[viewName]) {
@@ -1111,6 +1112,9 @@ function switchView(viewName) {
     fetchUsers();
   } else if (viewName === 'cache') {
     loadCache();
+  } else if (viewName === 'paths') {
+    loadSourcesForSelect();
+    loadPaths();
   }
 }
 
@@ -1133,3 +1137,394 @@ showDashboard = function() {
   origShowDashboard();
   switchView('knowledge');
 };
+
+
+// ── System Paths Section ──────────────────────────────────────────────────────
+
+async function loadSourcesForSelect() {
+  const select = document.getElementById('path-sources-select');
+  if (!select) return;
+  
+  if (cachedSources.length === 0) {
+    try {
+      const res = await fetch(`${API}/admin/sources`, { headers: auth() });
+      if (res.ok) {
+        cachedSources = await res.json();
+      }
+    } catch (e) {
+      console.error("Error loading sources for path picker:", e);
+    }
+  }
+  
+  select.innerHTML = '';
+  cachedSources.forEach(src => {
+    const opt = document.createElement('option');
+    opt.value = src.id;
+    opt.textContent = `[#${src.id}] ${src.title || 'Untitled'}`;
+    select.appendChild(opt);
+  });
+}
+
+function addStepInput(value = '') {
+  const container = document.getElementById('steps-container');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'step-input-row';
+  row.style.display = 'flex';
+  row.style.gap = '0.5rem';
+  row.style.alignItems = 'center';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'step-label-input';
+  input.value = value;
+  input.placeholder = `Step ${container.children.length + 1}`;
+  input.required = true;
+  input.style.flex = '1';
+  input.style.padding = '0.4rem 0.6rem';
+  input.style.borderRadius = '6px';
+  input.style.border = '1px solid var(--border-color)';
+  input.style.background = 'var(--bg-color)';
+  input.style.color = 'var(--text-main)';
+  input.addEventListener('input', renderLivePreview);
+
+  const btnUp = document.createElement('button');
+  btnUp.type = 'button';
+  btnUp.className = 'btn-ghost';
+  btnUp.textContent = '▲';
+  btnUp.style.padding = '0.2rem 0.4rem';
+  btnUp.addEventListener('click', () => {
+    if (row.previousElementSibling) {
+      container.insertBefore(row, row.previousElementSibling);
+      renderLivePreview();
+      updateStepPlaceholders();
+    }
+  });
+
+  const btnDown = document.createElement('button');
+  btnDown.type = 'button';
+  btnDown.className = 'btn-ghost';
+  btnDown.textContent = '▼';
+  btnDown.style.padding = '0.2rem 0.4rem';
+  btnDown.addEventListener('click', () => {
+    if (row.nextElementSibling) {
+      container.insertBefore(row.nextElementSibling, row);
+      renderLivePreview();
+      updateStepPlaceholders();
+    }
+  });
+
+  const btnDel = document.createElement('button');
+  btnDel.type = 'button';
+  btnDel.className = 'btn-ghost';
+  btnDel.textContent = '❌';
+  btnDel.style.padding = '0.2rem 0.4rem';
+  btnDel.addEventListener('click', () => {
+    row.remove();
+    renderLivePreview();
+    updateStepPlaceholders();
+  });
+
+  row.appendChild(input);
+  row.appendChild(btnUp);
+  row.appendChild(btnDown);
+  row.appendChild(btnDel);
+
+  container.appendChild(row);
+  renderLivePreview();
+}
+
+function updateStepPlaceholders() {
+  const container = document.getElementById('steps-container');
+  if (!container) return;
+  Array.from(container.children).forEach((row, idx) => {
+    const input = row.querySelector('.step-label-input');
+    if (input) input.placeholder = `Step ${idx + 1}`;
+  });
+}
+
+function renderLivePreview() {
+  const previewContainer = document.getElementById('path-live-preview');
+  if (!previewContainer) return;
+
+  const container = document.getElementById('steps-container');
+  const rows = container ? container.querySelectorAll('.step-label-input') : [];
+  const steps = Array.from(rows).map(input => input.value.trim()).filter(val => val !== '');
+
+  if (steps.length === 0) {
+    previewContainer.innerHTML = `
+      <div style="color: var(--text-muted); font-size: 0.9rem; font-style: italic;">
+        Type step labels in the form to see the flow preview.
+      </div>
+    `;
+    return;
+  }
+
+  let stepsHtml = steps.map(step => `
+    <div class="system-path-step-box" style="
+      border: 2px solid var(--primary-accent);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      background: var(--card-bg);
+      color: var(--primary-accent);
+      font-weight: 700;
+      font-size: 0.85rem;
+      box-shadow: 0 2px 4px rgba(194, 65, 12, 0.08);
+      white-space: nowrap;
+    ">
+      ${esc(step)}
+    </div>
+  `).join(`
+    <div class="system-path-arrow" style="
+      color: var(--primary-accent);
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0 0.25rem;
+    ">→</div>
+  `);
+
+  previewContainer.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0.5rem; width: 100%;">
+      ${stepsHtml}
+    </div>
+  `;
+}
+
+async function loadPaths() {
+  if (!token) return;
+  
+  const loadingEl = document.getElementById('paths-loading');
+  const emptyEl = document.getElementById('paths-empty');
+  const gridEl = document.getElementById('paths-grid');
+  
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (gridEl) gridEl.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API}/admin/system-paths`, { headers: auth() });
+    if (res.status === 401) { handleExpiredToken(); return; }
+    if (!res.ok) return;
+
+    const paths = await res.json();
+    if (loadingEl) loadingEl.classList.add('hidden');
+
+    if (paths.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      if (gridEl) gridEl.innerHTML = '';
+      return;
+    }
+
+    if (gridEl) {
+      gridEl.classList.remove('hidden');
+      gridEl.innerHTML = '';
+
+      paths.forEach(path => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.borderLeft = '4px solid var(--primary-accent)';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.justifyContent = 'space-between';
+        card.style.padding = '1.25rem';
+        card.style.marginBottom = '0';
+
+        const sortedSteps = path.steps.sort((a, b) => a.step_order - b.step_order);
+        const stepsPreview = sortedSteps.map(s => `
+          <span style="
+            border: 1px solid var(--primary-accent);
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: var(--card-bg);
+            color: var(--primary-accent);
+            white-space: nowrap;
+          ">${esc(s.step_label)}</span>
+        `).join('<span style="color:var(--primary-accent); font-size:0.75rem;">→</span>');
+
+        const linkedSources = path.sources.map(s => esc(s.title || `Source #${s.id}`)).join(', ') || 'None';
+
+        card.innerHTML = `
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+              <h4 style="margin:0; font-weight:700; color:var(--text-main); font-size:1rem;">${esc(path.title)}</h4>
+              <button class="btn-ghost delete-path-btn" style="padding:0.25rem; font-size:0.85rem;" data-id="${path.id}">🗑️</button>
+            </div>
+            ${path.description ? `<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 1rem; font-style:italic;">${esc(path.description)}</p>` : ''}
+            
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0.25rem; margin-bottom:1.25rem; background:rgba(194, 65, 12, 0.03); border: 1px solid var(--border-color); border-radius:6px; padding:0.75rem;">
+              ${stepsPreview || '<span style="font-style:italic; font-size:0.75rem; color:var(--text-muted);">No steps defined</span>'}
+            </div>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:0.75rem; margin-top:auto;">
+            <div style="font-size:0.75rem; color:var(--text-muted); max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${linkedSources}">
+              🔗 Sources: ${linkedSources}
+            </div>
+            <button class="btn-ghost edit-path-btn" style="padding:0.25rem 0.5rem; font-size:0.75rem; border:1px solid var(--border-color); border-radius:4px;" data-id="${path.id}">✏️ Edit</button>
+          </div>
+        `;
+
+        card.querySelector('.edit-path-btn').addEventListener('click', () => {
+          editPath(path);
+        });
+
+        card.querySelector('.delete-path-btn').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm(`Are you sure you want to delete the system path "${path.title}"?`)) {
+            try {
+              const delRes = await fetch(`${API}/admin/system-paths/${path.id}`, { method: 'DELETE', headers: auth() });
+              if (delRes.status === 401) { handleExpiredToken(); return; }
+              if (delRes.ok) {
+                toast('System path deleted successfully.', 'success');
+                loadPaths();
+                resetPathForm();
+              } else {
+                toast('Failed to delete system path.', 'error');
+              }
+            } catch {
+              toast('Network error.', 'error');
+            }
+          }
+        });
+
+        gridEl.appendChild(card);
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    if (loadingEl) loadingEl.classList.add('hidden');
+    toast('Error loading system paths', 'error');
+  }
+}
+
+function editPath(path) {
+  document.getElementById('path-form-title').textContent = 'Edit System Path';
+  document.getElementById('path-id').value = path.id;
+  document.getElementById('path-title-input').value = path.title;
+  document.getElementById('path-desc-input').value = path.description || '';
+
+  const container = document.getElementById('steps-container');
+  if (container) {
+    container.innerHTML = '';
+    const sorted = path.steps.sort((a, b) => a.step_order - b.step_order);
+    sorted.forEach(s => {
+      addStepInput(s.step_label);
+    });
+  }
+
+  const select = document.getElementById('path-sources-select');
+  if (select) {
+    Array.from(select.options).forEach(opt => opt.selected = false);
+    const linkedIds = path.sources.map(s => s.id);
+    Array.from(select.options).forEach(opt => {
+      if (linkedIds.includes(parseInt(opt.value, 10))) {
+        opt.selected = true;
+      }
+    });
+  }
+
+  const cancelBtn = document.getElementById('path-cancel-btn');
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+  const submitBtn = document.getElementById('path-submit-btn');
+  if (submitBtn) submitBtn.textContent = 'Save Changes';
+
+  document.getElementById('path-form-title').scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetPathForm() {
+  document.getElementById('path-form-title').textContent = 'Create System Path';
+  document.getElementById('path-id').value = '';
+  document.getElementById('path-form').reset();
+
+  const container = document.getElementById('steps-container');
+  if (container) {
+    container.innerHTML = '';
+    addStepInput();
+  }
+
+  const select = document.getElementById('path-sources-select');
+  if (select) {
+    Array.from(select.options).forEach(opt => opt.selected = false);
+  }
+
+  const cancelBtn = document.getElementById('path-cancel-btn');
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+  const submitBtn = document.getElementById('path-submit-btn');
+  if (submitBtn) submitBtn.textContent = 'Create Path';
+
+  renderLivePreview();
+}
+
+// Register Listeners
+const addStepBtnEl = document.getElementById('add-step-btn');
+if (addStepBtnEl) {
+  addStepBtnEl.addEventListener('click', () => addStepInput());
+}
+
+const cancelBtnEl = document.getElementById('path-cancel-btn');
+if (cancelBtnEl) {
+  cancelBtnEl.addEventListener('click', resetPathForm);
+}
+
+const pathFormEl = document.getElementById('path-form');
+if (pathFormEl) {
+  pathFormEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const pathId = document.getElementById('path-id').value;
+    const title = document.getElementById('path-title-input').value.trim();
+    const description = document.getElementById('path-desc-input').value.trim();
+    
+    const stepInputs = document.querySelectorAll('.step-label-input');
+    const steps = Array.from(stepInputs).map(input => input.value.trim()).filter(val => val !== '');
+    
+    if (steps.length === 0) {
+      toast('Please add at least one step in the sequence.', 'error');
+      return;
+    }
+
+    const select = document.getElementById('path-sources-select');
+    const sourceIds = Array.from(select.selectedOptions).map(opt => parseInt(opt.value, 10));
+
+    const method = pathId ? 'PUT' : 'POST';
+    const endpoint = pathId ? `${API}/admin/system-paths/${pathId}` : `${API}/admin/system-paths`;
+
+    const payload = {
+      title,
+      description: description || null,
+      steps,
+      source_ids: sourceIds
+    };
+
+    const submitBtn = document.getElementById('path-submit-btn');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    try {
+      const res = await fetch(endpoint, {
+        method,
+        headers: { ...auth(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.status === 401) { handleExpiredToken(); return; }
+      if (res.ok) {
+        toast(pathId ? 'System path updated successfully.' : 'System path created successfully.', 'success');
+        resetPathForm();
+        loadPaths();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast(data.detail || 'Failed to save system path.', 'error');
+      }
+    } catch {
+      toast('Connection error.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+}

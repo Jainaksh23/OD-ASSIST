@@ -54,6 +54,7 @@
         <button class="sidebar-nav-btn" data-view="insights">💡 Insights & Gaps</button>
         <button class="sidebar-nav-btn" data-view="users">👥 Manage Users</button>
         <button class="sidebar-nav-btn" data-view="cache">⚡ Semantic Cache</button>
+        <button class="sidebar-nav-btn" data-view="paths">🗺️ System Paths</button>
       </nav>
 
       <div class="sidebar-stats" id="sidebar-stats-section" style="padding: 0 1.5rem 1.25rem; border-bottom: 1px solid var(--border-color); gap: 0.75rem;">
@@ -414,6 +415,82 @@
           </div>
         </section>
         </div> <!-- End of Analytics View -->
+
+        <!-- System Paths View -->
+        <div id="view-paths" class="view-panel hidden">
+          <section id="section-paths" class="card" style="margin-top: 0; border-left: 4px solid var(--primary-accent);">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <div>
+                <h3 class="card-title" style="margin-bottom: 0.2rem;">System Paths Management</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Create and manage navigation flows. Steps are shown in sequence as boxes connected by arrows.</p>
+              </div>
+            </div>
+
+            <!-- Form & Live Preview Row -->
+            <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 3rem; border-bottom: 1px solid var(--border-color); padding-bottom: 2rem;">
+              <!-- Create/Edit Form -->
+              <div style="flex: 1; min-width: 320px;">
+                <h4 style="margin-bottom: 1.25rem;" id="path-form-title">Create System Path</h4>
+                <form id="path-form">
+                  <input type="hidden" id="path-id" value="" />
+                  
+                  <div class="field-group">
+                    <label>Path Title</label>
+                    <input id="path-title-input" type="text" placeholder="e.g. Student List Navigation" required />
+                  </div>
+                  
+                  <div class="field-group">
+                    <label>Description (optional)</label>
+                    <input id="path-desc-input" type="text" placeholder="e.g. Navigation steps to view student details" />
+                  </div>
+
+                  <div class="field-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                      <label style="margin: 0;">Steps Flow Sequence</label>
+                      <button type="button" id="add-step-btn" class="btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--border-color);">➕ Add Step</button>
+                    </div>
+                    <div id="steps-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                      <!-- Dynamic steps inputs inserted here via JS -->
+                    </div>
+                  </div>
+
+                  <div class="field-group">
+                    <label>Linked Knowledge Sources</label>
+                    <select id="path-sources-select" multiple style="width: 100%; height: 120px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                      <!-- Injected via JS -->
+                    </select>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Hold Ctrl (or Cmd) to select multiple sources.</p>
+                  </div>
+
+                  <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" id="path-submit-btn" class="btn-primary" style="flex: 1;">Create Path</button>
+                    <button type="button" id="path-cancel-btn" class="btn-ghost hidden" style="flex: 0.5;">Cancel</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Live WYSIWYG Flow Preview -->
+              <div style="flex: 1.2; min-width: 320px; display: flex; flex-direction: column;">
+                <h4 style="margin-bottom: 1.25rem;">Live Flow Diagram Preview</h4>
+                <div style="flex: 1; background: #FAF7F2; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 250px;">
+                  <div id="path-live-preview" style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem; justify-content: center; align-items: center;">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Existing Paths List -->
+            <div>
+              <h4 style="margin-bottom: 1.5rem;">Existing System Paths</h4>
+              <div id="paths-loading" class="placeholder-state" style="padding: 1rem;">Loading system paths…</div>
+              <div id="paths-empty" class="placeholder-state hidden" style="padding: 1rem;">No system paths defined yet. Create one above.</div>
+              <div id="paths-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+                <!-- Injected dynamically -->
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   </div>

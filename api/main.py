@@ -47,9 +47,10 @@ from api.auth import (create_access_token, get_current_user, require_admin,
                       verify_password, get_password_hash)
 from api.schemas import (FeedbackRequest, IngestRequest, LoginRequest,
                           QueryRequest, QueryResponse, SourceMetadata,
-                          SourceResponse, TokenResponse, BulkIngestRequest, UserCreate, UserResponse)
+                          SourceResponse, TokenResponse, BulkIngestRequest, UserCreate, UserResponse,
+                          SystemPathResponse, SystemPathCreate, SystemPathSimpleResponse)
 from db.db import SessionLocal, get_db, init_db
-from db.models import QueryLog, QueryCache, Source, User, Chunk
+from db.models import QueryLog, QueryCache, Source, User, Chunk, SystemPath, SystemPathStep
 from generation.confidence_check import determine_confidence
 from generation.generator import generate_answer
 from ingestion.orchestrator import process_source
@@ -216,6 +217,29 @@ def get_embedder(request: Request):
 
 def get_groq(request: Request):
     return request.app.state.groq_client
+
+
+def get_system_paths_for_sources(db: Session, source_ids: List[int]) -> List[dict]:
+    if not source_ids:
+        return []
+    from db.models import system_path_sources
+    paths = (
+        db.query(SystemPath)
+        .join(system_path_sources, SystemPath.id == system_path_sources.c.system_path_id)
+        .filter(system_path_sources.c.source_id.in_(source_ids))
+        .distinct()
+        .all()
+    )
+    result = []
+    for p in paths:
+        steps_sorted = sorted(p.steps, key=lambda s: s.step_order)
+        step_labels = [s.step_label for s in steps_sorted]
+        result.append({
+            "title": p.title,
+            "description": p.description,
+            "steps": step_labels
+        })
+    return result
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -510,6 +534,99 @@ def list_users(
     return db.query(User).order_by(User.id.desc()).all()
 
 
+# ── Admin System Paths ────────────────────────────────────────────────────────
+
+@app.get("/admin/system-paths", response_model=list[SystemPathResponse], tags=["admin"])
+def list_system_paths(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return db.query(SystemPath).order_by(SystemPath.created_at.desc()).all()
+
+
+@app.post("/admin/system-paths", response_model=SystemPathResponse, tags=["admin"])
+def create_system_path(
+    body: SystemPathCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    path = SystemPath(
+        title=body.title,
+        description=body.description
+    )
+    db.add(path)
+    db.flush()
+
+    # Create steps
+    for idx, label in enumerate(body.steps):
+        step = SystemPathStep(
+            system_path_id=path.id,
+            step_label=label,
+            step_order=idx + 1
+        )
+        db.add(step)
+
+    # Link sources
+    if body.source_ids:
+        sources = db.query(Source).filter(Source.id.in_(body.source_ids)).all()
+        path.sources.extend(sources)
+
+    db.commit()
+    db.refresh(path)
+    return path
+
+
+@app.put("/admin/system-paths/{path_id}", response_model=SystemPathResponse, tags=["admin"])
+def update_system_path(
+    path_id: int,
+    body: SystemPathCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    path = db.get(SystemPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="System path not found")
+
+    path.title = body.title
+    path.description = body.description
+
+    # Delete old steps
+    db.query(SystemPathStep).filter(SystemPathStep.system_path_id == path_id).delete()
+
+    # Re-create steps
+    for idx, label in enumerate(body.steps):
+        step = SystemPathStep(
+            system_path_id=path.id,
+            step_label=label,
+            step_order=idx + 1
+        )
+        db.add(step)
+
+    # Update sources
+    path.sources.clear()
+    if body.source_ids:
+        sources = db.query(Source).filter(Source.id.in_(body.source_ids)).all()
+        path.sources.extend(sources)
+
+    db.commit()
+    db.refresh(path)
+    return path
+
+
+@app.delete("/admin/system-paths/{path_id}", tags=["admin"])
+def delete_system_path(
+    path_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    path = db.get(SystemPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="System path not found")
+    db.delete(path)
+    db.commit()
+    return {"message": f"System path {path_id} deleted successfully"}
+
+
 # ── Chat ──────────────────────────────────────────────────────────────────────
 
 @app.post("/chat/query", response_model=QueryResponse, tags=["chat"])
@@ -582,6 +699,9 @@ def query_bot(
         db.commit()
         db.refresh(log_entry)
 
+        source_ids = [s.id for s in source_metas]
+        system_paths = get_system_paths_for_sources(db, source_ids)
+
         return QueryResponse(
             answer=answer,
             confidence=confidence,
@@ -589,6 +709,7 @@ def query_bot(
             query_id=log_entry.id,
             cached=True,
             response_time_ms=elapsed_ms,
+            system_paths=system_paths,
         )
 
     # ── CACHE MISS — full RAG pipeline ────────────────────────────────────
@@ -640,6 +761,9 @@ def query_bot(
         body.query[:80], elapsed_ms
     )
 
+    source_ids = [s.id for s in source_metas]
+    system_paths = get_system_paths_for_sources(db, source_ids)
+
     return QueryResponse(
         answer=gen["answer"],
         confidence=confidence,
@@ -647,6 +771,7 @@ def query_bot(
         query_id=log_entry.id,
         cached=False,
         response_time_ms=elapsed_ms,
+        system_paths=system_paths,
     )
 
 

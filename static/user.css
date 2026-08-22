@@ -857,3 +857,74 @@ body {
   background: var(--primary-soft);
   border-color: var(--primary-accent);
 }
+
+/* ---------- System Paths Diagrams ---------- */
+.system-paths-container {
+  margin: 0.75rem 0 0.75rem 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 560px;
+  animation: fadeUp 0.3s ease;
+}
+
+.system-path-card {
+  background: #FAF7F2;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+[data-theme="dark"] .system-path-card {
+  background: var(--card-bg);
+}
+
+.system-path-card-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.system-path-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 0.25rem 0;
+}
+
+.system-path-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.system-path-step-box {
+  border: 2px solid var(--primary-accent);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  background: var(--card-bg);
+  color: var(--primary-accent);
+  font-weight: 700;
+  font-size: 0.82rem;
+  box-shadow: 0 2px 4px rgba(194, 65, 12, 0.08);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.system-path-arrow {
+  color: var(--primary-accent);
+  font-weight: 700;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}

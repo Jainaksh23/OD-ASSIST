@@ -42,6 +42,7 @@ OD Assist is built for speed, accuracy, and ease of deployment.
   - **Users**: Admin user management.
   - **Feedbacks**: Detailed log of user upvotes/downvotes and specific user feedback.
   - **Semantic Cache**: Real-time stats (hit rate, average response times), cached items list with hit counters, and manual cache flushing.
+  - **System Paths**: Build dynamic visual navigation flows (rounded boxes and arrows) linked to specific knowledge sources, which automatically render in the user's chatbot interface when relevant topics are queried.
 
 ---
 
@@ -62,7 +63,7 @@ OD Assist is built for speed, accuracy, and ease of deployment.
 4. **Retrieval & Generation (On Cache Miss)**:
    - The system performs a hybrid search to find the top most relevant chunks from the database.
    - The LLM (Llama 3 via Groq) receives the user's question alongside the retrieved context chunks and generates a precise answer.
-   - The UI displays the answer, a confidence score, and clickable source citations.
+   - The UI displays the answer, a confidence score, clickable source citations, and automatically renders a beautiful visual **System Path** flow diagram if the cited source contains step-by-step navigation logic.
 
 ---
 
