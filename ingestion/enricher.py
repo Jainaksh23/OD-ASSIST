@@ -2,17 +2,18 @@ from groq import Groq
 
 def enrich_chunk(chunk_text: str, client: Groq) -> str:
     """
-    Uses Groq llama-3.3-70b-versatile to generate a one-line summary 
+    Uses Groq llama3-70b-8192 to generate a one-line summary 
     of the chunk for BM25 keyword search enhancement.
     """
-    prompt = f"Summarize the following text in exactly one short sentence. Do not add any introductory or concluding remarks, just output the summary:\n\n{chunk_text}"
-    
     try:
         response = client.chat.completions.create(
             model="qwen/qwen3.6-27b",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
-            temperature=0.0
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes technical text. Respond ONLY with the summary, no other text."},
+                {"role": "user", "content": f"Summarize the following text in one short sentence (max 15 words):\n\n{chunk_text}"}
+            ],
+            temperature=0.0,
+            max_tokens=50
         )
         summary = response.choices[0].message.content.strip()
         return summary

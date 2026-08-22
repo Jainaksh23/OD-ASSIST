@@ -18,12 +18,12 @@ def generate_answer(query: str, context_chunks: List[Dict], client: Groq) -> Dic
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2,
+            temperature=0.0,
             max_tokens=1024
         )
         answer = response.choices[0].message.content.strip()

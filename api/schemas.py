@@ -56,6 +56,8 @@ class QueryResponse(BaseModel):
     confidence: str
     sources: List[SourceMetadata]
     query_id: int
+    cached: bool = False
+    response_time_ms: int = 0
 
 class FeedbackRequest(BaseModel):
     query_id: int

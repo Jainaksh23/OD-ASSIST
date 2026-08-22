@@ -25,6 +25,8 @@ import os
 import shutil
 import threading
 import time
+import re
+from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -47,7 +49,7 @@ from api.schemas import (FeedbackRequest, IngestRequest, LoginRequest,
                           QueryRequest, QueryResponse, SourceMetadata,
                           SourceResponse, TokenResponse, BulkIngestRequest, UserCreate, UserResponse)
 from db.db import SessionLocal, get_db, init_db
-from db.models import QueryLog, Source, User, Chunk
+from db.models import QueryLog, QueryCache, Source, User, Chunk
 from generation.confidence_check import determine_confidence
 from generation.generator import generate_answer
 from ingestion.orchestrator import process_source
@@ -62,6 +64,8 @@ logger = logging.getLogger(__name__)
 TEMP_DIR = "temp_files"
 AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
 STUCK_THRESHOLD_MINUTES = 15 # sources in "processing" longer than this → mark failed
+CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
+CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "48"))
 
 
 # ── Auto-processor: picks up pending/stuck sources automatically ─────────────
@@ -517,7 +521,78 @@ def query_bot(
     embedder=Depends(get_embedder),
     groq_client=Depends(get_groq),
 ):
-    vec_results = search_vectors(body.query, db, embedder, k=20)
+    t_start = time.perf_counter()
+
+    # 1. Encode query once — reused for both cache lookup and vector search
+    query_embedding = embedder.encode(body.query)
+
+    # 2. Semantic cache lookup (pgvector cosine similarity, TTL-filtered)
+    cache_cutoff = datetime.now(timezone.utc) - timedelta(hours=CACHE_TTL_HOURS)
+    cache_sql = text("""
+        SELECT id, query_text, answer_text, sources_json, confidence,
+               1 - (query_embedding <=> CAST(:emb AS vector)) AS similarity
+        FROM query_cache
+        WHERE created_at >= :cutoff
+        ORDER BY query_embedding <=> CAST(:emb AS vector)
+        LIMIT 1
+    """)
+    cache_row = db.execute(cache_sql, {
+        "emb": str(query_embedding.tolist()),
+        "cutoff": cache_cutoff,
+    }).fetchone()
+
+    is_cache_hit = False
+    if cache_row and cache_row.similarity >= CACHE_SIMILARITY_THRESHOLD:
+        # ── CACHE HIT ─────────────────────────────────────────────────────
+        is_cache_hit = True
+        answer = cache_row.answer_text
+        confidence = cache_row.confidence or "medium"
+        source_metas = []
+        if cache_row.sources_json:
+            try:
+                source_metas = [SourceMetadata(**s) for s in json.loads(cache_row.sources_json)]
+            except Exception:
+                pass
+
+        # Update hit_count and last_hit_at
+        db.execute(
+            text("UPDATE query_cache SET hit_count = hit_count + 1, last_hit_at = NOW() WHERE id = :cid"),
+            {"cid": cache_row.id}
+        )
+
+        elapsed_ms = int((time.perf_counter() - t_start) * 1000)
+        logger.info(
+            "CACHE HIT (sim=%.4f) for query: '%s' — %dms",
+            cache_row.similarity, body.query[:80], elapsed_ms
+        )
+
+        # Log to QueryLog
+        normalized = re.sub(r'\s+', ' ', body.query.lower().strip())
+        log_entry = QueryLog(
+            user_id=None,
+            query=body.query,
+            answer=answer,
+            sources_used=cache_row.sources_json if cache_row.sources_json else "[]",
+            confidence=confidence,
+            normalized_query=normalized,
+            cached=True,
+            response_time_ms=elapsed_ms,
+        )
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+
+        return QueryResponse(
+            answer=answer,
+            confidence=confidence,
+            sources=source_metas,
+            query_id=log_entry.id,
+            cached=True,
+            response_time_ms=elapsed_ms,
+        )
+
+    # ── CACHE MISS — full RAG pipeline ────────────────────────────────────
+    vec_results = search_vectors(body.query, db, embedder, k=20, query_embedding=query_embedding)
     kw_results = search_keywords(body.query, db, k=20)
     merged = merge_results(vec_results, kw_results, top_k=5)
 
@@ -530,21 +605,48 @@ def query_bot(
         sources = db.query(Source).filter(Source.id.in_(gen["sources_used"])).all()
         source_metas = [SourceMetadata(id=s.id, title=s.title or f"Source {s.id}") for s in sources]
 
+    elapsed_ms = int((time.perf_counter() - t_start) * 1000)
+
+    # Store in cache for future queries
+    sources_json_str = json.dumps([{"id": s.id, "title": s.title} for s in source_metas])
+    cache_entry = QueryCache(
+        query_text=body.query,
+        query_embedding=query_embedding.tolist(),
+        answer_text=gen["answer"],
+        sources_json=sources_json_str,
+        confidence=confidence,
+        hit_count=0,
+    )
+    db.add(cache_entry)
+
+    normalized = re.sub(r'\s+', ' ', body.query.lower().strip())
+
     log_entry = QueryLog(
         user_id=None,
         query=body.query,
         answer=gen["answer"],
         sources_used=json.dumps(gen["sources_used"]),
+        confidence=confidence,
+        normalized_query=normalized,
+        cached=False,
+        response_time_ms=elapsed_ms,
     )
     db.add(log_entry)
     db.commit()
     db.refresh(log_entry)
+
+    logger.info(
+        "CACHE MISS for query: '%s' — %dms (stored in cache)",
+        body.query[:80], elapsed_ms
+    )
 
     return QueryResponse(
         answer=gen["answer"],
         confidence=confidence,
         sources=source_metas,
         query_id=log_entry.id,
+        cached=False,
+        response_time_ms=elapsed_ms,
     )
 
 
@@ -563,6 +665,228 @@ def submit_feedback(
     log.feedback = body.feedback
     db.commit()
     return {"message": "Feedback recorded"}
+
+
+@app.get("/admin/insights", tags=["admin"])
+def get_insights(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    frequent_gaps_query = (
+        db.query(
+            QueryLog.normalized_query,
+            func.count(QueryLog.id).label("count"),
+            func.max(QueryLog.created_at).label("last_asked"),
+            func.max(QueryLog.query).label("example_query")
+        )
+        .filter(QueryLog.confidence == "low")
+        .group_by(QueryLog.normalized_query)
+        .having(func.count(QueryLog.id) >= 2)
+        .order_by(func.count(QueryLog.id).desc())
+        .limit(20)
+        .all()
+    )
+
+    frequent_gaps = [
+        {
+            "query": row.example_query,
+            "count": row.count,
+            "last_asked": row.last_asked,
+            "confidence": "low"
+        }
+        for row in frequent_gaps_query
+    ]
+
+    rare_questions_query = (
+        db.query(
+            QueryLog.normalized_query,
+            func.count(QueryLog.id).label("count"),
+            func.max(QueryLog.created_at).label("last_asked"),
+            func.max(QueryLog.query).label("example_query"),
+            func.max(QueryLog.confidence).label("confidence")
+        )
+        .group_by(QueryLog.normalized_query)
+        .having(func.count(QueryLog.id) == 1)
+        .order_by(func.max(QueryLog.created_at).desc())
+        .limit(30)
+        .all()
+    )
+
+    rare_questions = [
+        {
+            "query": row.example_query,
+            "count": row.count,
+            "last_asked": row.last_asked,
+            "confidence": row.confidence
+        }
+        for row in rare_questions_query
+    ]
+
+    return {
+        "frequent_gaps": frequent_gaps,
+        "rare_questions": rare_questions
+    }
+
+
+@app.get("/admin/analytics", tags=["admin"])
+def get_analytics(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import text, desc
+    from collections import Counter
+    import datetime
+
+    now = datetime.datetime.now(timezone.utc)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_week = start_of_today - datetime.timedelta(days=start_of_today.weekday())
+    last_14_days = start_of_today - datetime.timedelta(days=14)
+
+    # 1. Top Stat Cards
+    total_queries = db.query(QueryLog).count()
+    queries_today = db.query(QueryLog).filter(QueryLog.created_at >= start_of_today).count()
+    queries_this_week = db.query(QueryLog).filter(QueryLog.created_at >= start_of_week).count()
+    
+    high_conf = db.query(QueryLog).filter(QueryLog.confidence == "high").count()
+    avg_confidence_rate = (high_conf / total_queries * 100) if total_queries > 0 else 0
+
+    # 2. Usage Trend (last 14 days)
+    # Using PostgreSQL cast to DATE
+    usage_trend_raw = db.query(
+        func.date(QueryLog.created_at).label("d"), 
+        func.count(QueryLog.id)
+    ).filter(QueryLog.created_at >= last_14_days).group_by(func.date(QueryLog.created_at)).all()
+    
+    usage_trend = [{"date": str(row[0]), "count": row[1]} for row in usage_trend_raw]
+
+    # 3. Top Questions
+    top_questions_raw = db.query(
+        QueryLog.normalized_query, 
+        func.count(QueryLog.id).label("c"),
+        func.max(QueryLog.query).label("q")
+    ).group_by(QueryLog.normalized_query).order_by(desc("c")).limit(10).all()
+    
+    top_questions = [{"query": r.q, "count": r.c} for r in top_questions_raw]
+
+    # 4. Feedback Stats
+    feedback_total = db.query(QueryLog).filter(QueryLog.feedback.isnot(None)).count()
+    feedback_up = db.query(QueryLog).filter(QueryLog.feedback == "up").count()
+    feedback_down = db.query(QueryLog).filter(QueryLog.feedback == "down").count()
+    
+    most_disliked_raw = db.query(
+        QueryLog.normalized_query,
+        func.count(QueryLog.id).label("c"),
+        func.max(QueryLog.query).label("q")
+    ).filter(QueryLog.feedback == "down").group_by(QueryLog.normalized_query).order_by(desc("c")).limit(5).all()
+    
+    most_disliked = [{"query": r.q, "count": r.c} for r in most_disliked_raw]
+
+    # 5. Confidence Distribution
+    conf_dist_raw = db.query(QueryLog.confidence, func.count(QueryLog.id)).group_by(QueryLog.confidence).all()
+    conf_dist = {row[0]: row[1] for row in conf_dist_raw}
+
+    # 6. Peak Usage Time (Hour of day)
+    peak_usage_raw = db.query(
+        func.extract('hour', QueryLog.created_at).label("h"), 
+        func.count(QueryLog.id)
+    ).group_by(func.extract('hour', QueryLog.created_at)).all()
+    
+    peak_usage = [{"hour": int(r[0]), "count": r[1]} for r in peak_usage_raw if r[0] is not None]
+
+    # 7. Most-Cited Sources
+    # Read all sources_used (JSON string of arrays) and aggregate in Python
+    all_sources = db.query(QueryLog.sources_used).filter(QueryLog.sources_used.isnot(None)).all()
+    source_counter = Counter()
+    for (su,) in all_sources:
+        try:
+            ids = json.loads(su)
+            if isinstance(ids, list):
+                source_counter.update(ids)
+        except Exception:
+            pass
+            
+    top_source_ids = [s_id for s_id, _ in source_counter.most_common(10)]
+    source_titles = {}
+    if top_source_ids:
+        sources = db.query(Source.id, Source.title).filter(Source.id.in_(top_source_ids)).all()
+        source_titles = {s.id: s.title for s in sources}
+        
+    most_cited_sources = [
+        {"id": s_id, "title": source_titles.get(s_id, f"Unknown Source {s_id}"), "count": count}
+        for s_id, count in source_counter.most_common(10)
+    ]
+
+    # 8. Semantic Cache Stats
+    cached_queries = db.query(QueryLog).filter(QueryLog.cached == True).count()
+    fresh_queries = total_queries - cached_queries
+    cache_hit_rate = round((cached_queries / total_queries * 100), 1) if total_queries > 0 else 0
+
+    avg_cached_time = db.query(func.avg(QueryLog.response_time_ms)).filter(
+        QueryLog.cached == True, QueryLog.response_time_ms > 0
+    ).scalar() or 0
+    avg_fresh_time = db.query(func.avg(QueryLog.response_time_ms)).filter(
+        QueryLog.cached == False, QueryLog.response_time_ms > 0
+    ).scalar() or 0
+
+    return {
+        "top_stats": {
+            "total_queries": total_queries,
+            "queries_today": queries_today,
+            "queries_this_week": queries_this_week,
+            "avg_confidence_rate": round(avg_confidence_rate, 1)
+        },
+        "usage_trend": usage_trend,
+        "top_questions": top_questions,
+        "feedback_stats": {
+            "total": feedback_total,
+            "up": feedback_up,
+            "down": feedback_down,
+            "most_disliked": most_disliked
+        },
+        "confidence_distribution": conf_dist,
+        "peak_usage_time": peak_usage,
+        "most_cited_sources": most_cited_sources,
+        "cache_stats": {
+            "hit_rate": cache_hit_rate,
+            "cached_queries": cached_queries,
+            "fresh_queries": fresh_queries,
+            "avg_cached_time_ms": round(float(avg_cached_time)),
+            "avg_fresh_time_ms": round(float(avg_fresh_time)),
+        }
+    }
+
+
+@app.get("/admin/cache", tags=["admin"])
+def get_cached_queries(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from db.models import QueryCache
+    cached = db.query(QueryCache).order_by(QueryCache.hit_count.desc(), QueryCache.created_at.desc()).all()
+    return [
+        {
+            "id": c.id,
+            "query_text": c.query_text,
+            "answer_text": c.answer_text,
+            "confidence": c.confidence,
+            "hit_count": c.hit_count,
+            "created_at": c.created_at,
+            "last_hit_at": c.last_hit_at,
+        }
+        for c in cached
+    ]
+
+
+@app.post("/admin/cache/clear", tags=["admin"])
+def clear_semantic_cache(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from db.models import QueryCache
+    flushed = db.query(QueryCache).delete()
+    db.commit()
+    logger.info("Admin manually flushed %d semantic cache entries", flushed)
+    return {"message": "Semantic cache cleared successfully", "count": flushed}
 
 
 # ── Page routing ──────────────────────────────────────────────────────────────

@@ -335,3 +335,43 @@ h1, h2, h3, h4, h5, h6 {
   .sources-grid { grid-template-columns: 1fr; }
   .stat-box { min-width: 100%; }
 }
+
+/* Sidebar navigation button styles */
+.sidebar-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: calc(100% - 2rem);
+  margin: 0.25rem 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-family: inherit;
+}
+.sidebar-nav-btn:hover {
+  background: var(--bg-color);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+.sidebar-nav-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary-accent);
+  border-color: rgba(194, 65, 12, 0.2);
+  box-shadow: var(--shadow-sm);
+}
+
+/* View panel styles */
+.view-panel {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+.view-panel.hidden {
+  display: none !important;
+}

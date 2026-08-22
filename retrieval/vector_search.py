@@ -2,11 +2,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict
 
-def search_vectors(query: str, db: Session, embedder, k: int = 20) -> List[Dict]:
+def search_vectors(query: str, db: Session, embedder, k: int = 20, query_embedding=None) -> List[Dict]:
     """
     Performs cosine similarity search using pgvector `<=>` operator.
+    Accepts an optional pre-computed query_embedding to avoid redundant encoding.
     """
-    query_embedding = embedder.encode(query)
+    if query_embedding is None:
+        query_embedding = embedder.encode(query)
     
     # Raw SQL with pgvector for performance and direct operator usage
     sql = text("""

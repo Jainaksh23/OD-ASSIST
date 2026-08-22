@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/admin.css" />
+  <link rel="stylesheet" href="/static/admin.css?v=2" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -46,18 +47,27 @@
         <span class="icon-badge">⚡</span> OD Assist <span class="badge">Admin</span>
       </div>
       
-      <div class="sidebar-stats">
-        <div class="stat-box">
-          <div class="stat-value" id="stat-total">0</div>
-          <div class="stat-label">Total</div>
+      <h3 class="sidebar-heading">Navigation</h3>
+      <nav class="sidebar-source-list" style="flex: 0; min-height: fit-content; overflow: visible; padding: 0.5rem 0; margin-bottom: 0.5rem;">
+        <button class="sidebar-nav-btn active" data-view="knowledge">📚 Knowledge Base</button>
+        <button class="sidebar-nav-btn" data-view="analytics">📊 Analytics Dashboard</button>
+        <button class="sidebar-nav-btn" data-view="insights">💡 Insights & Gaps</button>
+        <button class="sidebar-nav-btn" data-view="users">👥 Manage Users</button>
+        <button class="sidebar-nav-btn" data-view="cache">⚡ Semantic Cache</button>
+      </nav>
+
+      <div class="sidebar-stats" id="sidebar-stats-section" style="padding: 0 1.5rem 1.25rem; border-bottom: 1px solid var(--border-color); gap: 0.75rem;">
+        <div class="stat-box" style="padding: 0.75rem 0.5rem;">
+          <div class="stat-value" id="stat-total" style="font-size: 1.25rem;">0</div>
+          <div class="stat-label" style="font-size: 0.65rem; margin-top: 0.25rem;">Total</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-completed">0</div>
-          <div class="stat-label">Done</div>
+        <div class="stat-box" style="padding: 0.75rem 0.5rem;">
+          <div class="stat-value" id="stat-completed" style="font-size: 1.25rem;">0</div>
+          <div class="stat-label" style="font-size: 0.65rem; margin-top: 0.25rem;">Done</div>
         </div>
       </div>
       
-      <h3 class="sidebar-heading">Sources List</h3>
+      <h3 class="sidebar-heading" id="sources-heading">Sources List</h3>
       <nav class="sidebar-source-list" id="sidebar-sources">
         <!-- JS injects nav items -->
       </nav>
@@ -78,7 +88,9 @@
       </header>
 
       <div class="main-scroll">
-        <!-- Ingest Card -->
+        <!-- Knowledge Base View -->
+        <div id="view-knowledge" class="view-panel">
+          <!-- Ingest Card -->
         <section class="card">
           <h3 class="card-title">Add Knowledge Source</h3>
           <nav class="tab-nav">
@@ -181,9 +193,12 @@
             <!-- Source cards injected here -->
           </div>
         </section>
+        </div> <!-- End of Knowledge Base View -->
 
-        <!-- Manage Users Section -->
-        <section class="card" style="margin-top: 2rem;">
+        <!-- Manage Users View -->
+        <div id="view-users" class="view-panel hidden">
+          <!-- Manage Users Section -->
+          <section class="card" style="margin-top: 0;">
           <h3 class="card-title">Manage Users</h3>
           <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
             <!-- Create User Form -->
@@ -219,6 +234,182 @@
             </div>
           </div>
         </section>
+        </div> <!-- End of Manage Users View -->
+
+        <!-- Semantic Cache View -->
+        <div id="view-cache" class="view-panel hidden">
+          <!-- Semantic Cache Management Section -->
+          <section id="section-cache" class="card" style="margin-top: 0; border-left: 4px solid var(--warning);">
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 0.2rem;">Semantic Cache Management</h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Monitor and manually flush the semantic query cache.</p>
+            </div>
+            <button id="clear-cache-btn" class="btn-danger" style="background-color: var(--danger); border: none; padding: 0.5rem 1rem; border-radius: 8px; color: white; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
+              <span>🧹</span> Clear Cache
+            </button>
+          </div>
+
+          <div id="cache-loading" class="placeholder-state" style="padding: 1rem;">Loading cache entries…</div>
+          <div id="cache-empty" class="placeholder-state hidden" style="padding: 1rem;">Cache is currently empty.</div>
+          
+          <div id="cache-table-container" class="users-list hidden" style="max-height: 400px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
+                  <th style="padding: 0.5rem; width: 35%;">Query</th>
+                  <th style="padding: 0.5rem; width: 45%;">Answer Snippet</th>
+                  <th style="padding: 0.5rem; width: 10%; text-align: center;">Hits</th>
+                  <th style="padding: 0.5rem; width: 10%;">Last Used</th>
+                </tr>
+              </thead>
+              <tbody id="cache-list">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+        </div> <!-- End of Semantic Cache View -->
+
+        <!-- Insights View -->
+        <div id="view-insights" class="view-panel hidden">
+          <!-- Insights Section -->
+          <section id="section-insights" class="card" style="margin-top: 0; border-left: 4px solid var(--accent);">
+          <h3 class="card-title">Knowledge Insights & Gaps</h3>
+          <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">Track user queries to identify what content is missing from your knowledge base.</p>
+          
+          <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <!-- Frequent Gaps -->
+            <div style="flex: 1; min-width: 300px;">
+              <h4 style="margin-bottom: 1rem; color: #ff5252; display: flex; align-items: center; gap: 0.5rem;">
+                🔴 Frequently Asked — Missing from our data
+              </h4>
+              <div id="insights-gaps-loading" class="placeholder-state" style="padding: 1rem;">Loading insights…</div>
+              <div id="insights-gaps-list" class="users-list hidden" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            
+            <!-- Rare Questions -->
+            <div style="flex: 1; min-width: 300px;">
+              <h4 style="margin-bottom: 1rem; color: #42a5f5; display: flex; align-items: center; gap: 0.5rem;">
+                🔵 Rare Questions
+              </h4>
+              <div id="insights-rare-loading" class="placeholder-state" style="padding: 1rem;">Loading insights…</div>
+              <div id="insights-rare-list" class="users-list hidden" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 1rem; text-align: right;">
+            <button id="refresh-insights-btn" class="btn-ghost">🔄 Refresh Insights</button>
+          </div>
+        </section>
+        </div> <!-- End of Insights View -->
+
+        <!-- Analytics View -->
+        <div id="view-analytics" class="view-panel hidden">
+          <!-- Analytics Section -->
+          <section id="section-analytics" class="card" style="margin-top: 0; border-left: 4px solid var(--accent);">
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 0.2rem;">Analytics Dashboard</h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Comprehensive usage and performance metrics.</p>
+            </div>
+            <button id="refresh-analytics-btn" class="btn-ghost">🔄 Refresh</button>
+          </div>
+          
+          <!-- Top Stat Cards -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+              <div class="stat-value" id="analytics-total">0</div>
+              <div class="stat-label">Total Queries</div>
+            </div>
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+              <div class="stat-value" id="analytics-today">0</div>
+              <div class="stat-label">Queries Today</div>
+            </div>
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+              <div class="stat-value" id="analytics-week">0</div>
+              <div class="stat-label">Queries This Week</div>
+            </div>
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border);">
+              <div class="stat-value" id="analytics-conf">0%</div>
+              <div class="stat-label">High Confidence</div>
+            </div>
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border); border-left: 3px solid #4caf50;">
+              <div class="stat-value" id="analytics-cache-rate" style="color: #4caf50;">0%</div>
+              <div class="stat-label">Cache Hit Rate</div>
+            </div>
+            <div class="stat-box" style="background: var(--surface-hover); border: 1px solid var(--border); border-left: 3px solid #42a5f5;">
+              <div class="stat-value" id="analytics-cache-time" style="font-size: 0.95rem; color: #42a5f5;">—</div>
+              <div class="stat-label">Avg Response Time</div>
+            </div>
+          </div>
+
+          <!-- Charts Row 1 -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+            <!-- Usage Trend -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Usage Trend (Last 14 Days)</h4>
+              <canvas id="usageChart" height="200"></canvas>
+            </div>
+            <!-- Peak Usage Time -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Peak Usage Time (Hours)</h4>
+              <canvas id="peakTimeChart" height="200"></canvas>
+            </div>
+          </div>
+
+          <!-- Charts Row 2 -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+            <!-- Confidence Distribution -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Confidence Distribution</h4>
+              <div style="max-height: 250px; display: flex; justify-content: center;">
+                <canvas id="confidenceChart"></canvas>
+              </div>
+            </div>
+            <!-- Feedback Stats -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Feedback Stats</h4>
+              <div style="margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                  <span>Positive</span>
+                  <span id="feedback-pos-pct">0%</span>
+                </div>
+                <div style="width: 100%; background: #ff5252; height: 8px; border-radius: 4px; overflow: hidden; display: flex;">
+                  <div id="feedback-pos-bar" style="width: 0%; background: #4caf50; height: 100%;"></div>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" id="feedback-total">0 total feedback</div>
+              </div>
+              <h5 style="margin-top: 1.5rem; margin-bottom: 0.5rem; font-size: 0.9rem; color: #ff5252;">Most Disliked Queries</h5>
+              <ul id="disliked-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: var(--text-muted);">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Lists Row -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+            <!-- Top Questions -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Top 10 Questions</h4>
+              <ul id="top-questions-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+            <!-- Most Cited Sources -->
+            <div style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1rem; border-radius: 8px;">
+              <h4 style="margin-bottom: 1rem; font-size: 1rem;">Most Cited Sources</h4>
+              <ul id="most-cited-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+          </div>
+        </section>
+        </div> <!-- End of Analytics View -->
       </div>
     </main>
   </div>
@@ -237,6 +428,6 @@
 
   <div id="toasts"></div>
 
-  <script src="/static/admin.js"></script>
+  <script src="/static/admin.js?v=2"></script>
 </body>
 </html>

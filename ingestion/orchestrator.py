@@ -108,6 +108,13 @@ def process_source(
         source.chunk_count = len(db_chunks)
         source.status = "completed"
         source.error_message = None
+
+        # ── Cache invalidation: new content means cached answers may be stale ──
+        from db.models import QueryCache
+        flushed = db.query(QueryCache).delete()
+        if flushed:
+            logger.info("source_id=%d: flushed %d semantic cache entries (new content available)", source_id, flushed)
+
         db.commit()
         logger.info("source_id=%d ingestion completed (%d chunks)", source_id, len(db_chunks))
 

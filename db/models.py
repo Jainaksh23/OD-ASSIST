@@ -1,9 +1,9 @@
 """
 models.py — SQLAlchemy ORM models for OD Assist.
-Tables: users, sources, chunks (pgvector), query_logs
+Tables: users, sources, chunks (pgvector), query_logs, query_cache
 """
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, TIMESTAMP
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -78,6 +78,26 @@ class QueryLog(Base):
     answer = Column(Text)
     sources_used = Column(Text)   # JSON array of source_ids
     feedback = Column(String(10)) # 'up' | 'down' | None
+    confidence = Column(String(20)) # 'high' | 'medium' | 'low'
+    normalized_query = Column(Text) # For grouping similar queries
+    cached = Column(Boolean, default=False)        # Was this served from semantic cache?
+    response_time_ms = Column(Integer, default=0)  # Wall-clock ms for this request
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="query_logs")
+
+
+class QueryCache(Base):
+    """Semantic cache: stores recent query→answer pairs with embeddings
+    for fast cosine-similarity lookups via pgvector."""
+    __tablename__ = "query_cache"
+
+    id = Column(Integer, primary_key=True, index=True)
+    query_text = Column(Text, nullable=False)
+    query_embedding = Column(Vector(384), nullable=False)
+    answer_text = Column(Text, nullable=False)
+    sources_json = Column(Text)        # JSON: [{id, title}, ...]
+    confidence = Column(String(20))    # 'high' | 'medium' | 'low'
+    hit_count = Column(Integer, default=0)
+    last_hit_at = Column(TIMESTAMP(timezone=True))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
