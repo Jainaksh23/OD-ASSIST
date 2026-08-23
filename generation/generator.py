@@ -39,13 +39,15 @@ def generate_answer(query: str, context_chunks: List[Dict], client: Groq) -> Dic
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.0,
-            max_tokens=1024
+            max_tokens=2048,
+            reasoning_effort="low",
+            reasoning_format="hidden"
         )
         raw_answer = response.choices[0].message.content.strip()
         answer = strip_thinking(raw_answer)
