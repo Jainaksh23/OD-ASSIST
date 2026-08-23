@@ -28,13 +28,7 @@ def generate_answer(query: str, context_chunks: List[Dict], client: Groq, system
     Calls Groq to generate an answer based on the context and system paths.
     Returns the answer text and the unique source IDs used.
     """
-    if not context_chunks and not system_paths:
-        return {
-            "answer": "I don't have enough information to answer this confidently.",
-            "sources_used": [],
-            "raw_response": None
-        }
-        
+
     prompt = build_prompt(query, context_chunks, system_paths)
     
     try:
