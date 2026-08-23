@@ -1,45 +1,31 @@
 from sqlalchemy.orm import Session
-from rank_bm25 import BM25Okapi
+from sqlalchemy import text
 from typing import List, Dict
-from db.models import Chunk, Source
 
 def search_keywords(query: str, db: Session, k: int = 20) -> List[Dict]:
     """
-    Performs BM25 keyword search over all chunks (MVP implementation).
+    Performs fast keyword search using PostgreSQL Full-Text Search.
     """
-    # For MVP, load all chunks. This can be optimized later (e.g. elasticsearch or pg_trgm)
-    all_chunks = db.query(Chunk, Source.title).join(Source, Chunk.source_id == Source.id).all()
+    sql = text("""
+        SELECT c.id, c.source_id, c.chunk_text, c.chunk_summary, s.title,
+               ts_rank_cd(to_tsvector('english', coalesce(c.chunk_summary, '') || ' ' || c.chunk_text), websearch_to_tsquery('english', :query)) AS score
+        FROM chunks c
+        JOIN sources s ON c.source_id = s.id
+        WHERE to_tsvector('english', coalesce(c.chunk_summary, '') || ' ' || c.chunk_text) @@ websearch_to_tsquery('english', :query)
+        ORDER BY score DESC
+        LIMIT :k
+    """)
     
-    if not all_chunks:
-        return []
-        
-    corpus = []
-    chunk_meta = []
+    result = db.execute(sql, {"query": query, "k": k}).fetchall()
     
-    for chunk, source_title in all_chunks:
-        # We index the concatenation of summary and text
-        text_to_index = f"{chunk.chunk_summary or ''} {chunk.chunk_text}"
-        corpus.append(text_to_index.lower().split())
-        chunk_meta.append({
-            "id": chunk.id,
-            "source_id": chunk.source_id,
-            "chunk_text": chunk.chunk_text,
-            "chunk_summary": chunk.chunk_summary,
-            "source_title": source_title
-        })
-        
-    bm25 = BM25Okapi(corpus)
-    tokenized_query = query.lower().split()
-    scores = bm25.get_scores(tokenized_query)
-    
-    # Get top k
-    top_k_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
-    
-    results = []
-    for idx in top_k_indices:
-        if scores[idx] > 0: # only return if there's some match
-            meta = chunk_meta[idx]
-            meta["score"] = scores[idx]
-            results.append(meta)
-            
-    return results
+    return [
+        {
+            "id": row[0],
+            "source_id": row[1],
+            "chunk_text": row[2],
+            "chunk_summary": row[3],
+            "source_title": row[4],
+            "score": row[5]
+        }
+        for row in result
+    ]

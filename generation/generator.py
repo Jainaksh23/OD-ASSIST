@@ -39,7 +39,7 @@ def generate_answer(query: str, context_chunks: List[Dict], client: Groq) -> Dic
     
     try:
         response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}

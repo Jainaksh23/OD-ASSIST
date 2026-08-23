@@ -60,6 +60,20 @@ def init_db():
             ))
         conn.commit()
 
+    # Create GIN index on chunks for full-text keyword search
+    with engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE c.relname = 'chunks_fts_idx' AND n.nspname = 'public';"
+        )).fetchone()
+
+        if not result:
+            conn.execute(text(
+                "CREATE INDEX chunks_fts_idx ON chunks USING GIN "
+                "(to_tsvector('english', coalesce(chunk_summary, '') || ' ' || chunk_text));"
+            ))
+        conn.commit()
+
     # Seed default system paths
     db = SessionLocal()
     try:
