@@ -35,7 +35,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import (BackgroundTasks, Depends, FastAPI, File, Form,
                      HTTPException, Request, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from groq import Groq
 from sentence_transformers import SentenceTransformer
@@ -708,6 +708,106 @@ def get_suggested_faqs(admin: User = Depends(require_admin), db: Session = Depen
             
     return results
 
+@app.post("/admin/faqs/generate-from-sources", tags=["admin"])
+async def generate_faqs_from_sources(request: Request, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """
+    Bulk auto-generates FAQs from all 'completed' sources using Groq.
+    Yields progress as SSE.
+    """
+    groq_client = request.app.state.groq_client
+    
+    # Get all completed sources
+    sources = db.query(Source).filter(Source.status == "completed").all()
+    
+    if not sources:
+        async def empty_stream():
+            yield f"data: {json.dumps({'status': 'error', 'message': 'No completed sources found'})}\n\n"
+        return StreamingResponse(empty_stream(), media_type="text/event-stream")
+        
+    async def event_stream():
+        total = len(sources)
+        yield f"data: {json.dumps({'status': 'starting', 'total': total, 'progress': 0})}\n\n"
+        
+        with SessionLocal() as session:
+            for i, source in enumerate(sources):
+                yield f"data: {json.dumps({'status': 'generating', 'progress': i, 'total': total, 'source_title': source.title})}\n\n"
+                
+                # Get top chunks
+                chunks = session.query(Chunk).filter(Chunk.source_id == source.id).limit(10).all()
+                if not chunks:
+                    continue
+                    
+                combined_text = "\\n\\n".join([c.chunk_text for c in chunks])
+                combined_text = combined_text[:12000] # Fit in context window
+                
+                prompt = (
+                    "Given this ERP documentation content, generate 2-3 frequently-asked-question style Q&A pairs "
+                    "that a real user of this software would naturally ask. Questions should be short and practical. "
+                    "Answers should be concise (2-4 sentences), based ONLY on the given content. "
+                    "Return EXACTLY as a JSON array of objects with 'question' and 'answer' keys. "
+                    "Do not include any markdown formatting like ```json or any other text.\\n\\n"
+                    f"CONTENT:\\n{combined_text}"
+                )
+                
+                try:
+                    response = groq_client.chat.completions.create(
+                        model="openai/gpt-oss-120b",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.2,
+                        max_tokens=1024
+                    )
+                    
+                    raw_text = response.choices[0].message.content.strip()
+                    # Strip markdown if present
+                    if raw_text.startswith("```json"):
+                        raw_text = raw_text[7:]
+                    if raw_text.startswith("```"):
+                        raw_text = raw_text[3:]
+                    if raw_text.endswith("```"):
+                        raw_text = raw_text[:-3]
+                    
+                    qa_pairs = json.loads(raw_text.strip())
+                    
+                    # Guess category
+                    cat = "General"
+                    title_lower = source.title.lower() if source.title else ""
+                    if "fee" in title_lower or "pay" in title_lower: cat = "Fees"
+                    elif "transport" in title_lower or "bus" in title_lower: cat = "Transport"
+                    elif "admission" in title_lower or "enroll" in title_lower: cat = "Admissions"
+                    elif "payroll" in title_lower or "salary" in title_lower: cat = "Payroll"
+                    
+                    for pair in qa_pairs:
+                        if "question" in pair and "answer" in pair:
+                            new_faq = FAQ(
+                                question=pair["question"],
+                                answer=pair["answer"],
+                                category=cat,
+                                linked_source_id=source.id,
+                                is_published=False,
+                                display_order=999 # Append to end
+                            )
+                            session.add(new_faq)
+                    session.commit()
+                except Exception as e:
+                    logger.error(f"Error generating FAQ for source {source.id}: {e}")
+                    session.rollback()
+                    continue
+                    
+        yield f"data: {json.dumps({'status': 'completed', 'total': total, 'progress': total})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/admin/faqs/publish-all", tags=["admin"])
+def publish_all_faqs(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """
+    Sets is_published=True for all draft FAQs.
+    """
+    drafts = db.query(FAQ).filter(FAQ.is_published == False).all()
+    count = len(drafts)
+    for draft in drafts:
+        draft.is_published = True
+    db.commit()
+    return {"status": "success", "published_count": count}
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
 

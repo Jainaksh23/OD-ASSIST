@@ -569,10 +569,33 @@
 
             <!-- Existing FAQs List -->
             <div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h4>Existing FAQs</h4>
-                <button id="faq-save-order-btn" class="btn-ghost hidden" style="color: var(--primary-color);">💾 Save Display Order</button>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <h4 style="margin: 0;">Existing FAQs</h4>
+                  <nav class="tab-nav faq-status-filters" style="margin: 0; padding: 0.2rem; background: var(--bg-color); border-radius: 8px;">
+                    <button class="tab-btn active filter-btn" data-faq-filter="all" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">All</button>
+                    <button class="tab-btn filter-btn" data-faq-filter="published" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">Published</button>
+                    <button class="tab-btn filter-btn" data-faq-filter="draft" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">Drafts</button>
+                  </nav>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <button id="faq-auto-gen-btn" class="btn-ghost" style="color: var(--primary-accent); border: 1px solid var(--primary-accent);">✨ Auto-generate FAQs</button>
+                  <button id="faq-publish-all-btn" class="btn-ghost" style="color: #4caf50; border: 1px solid #4caf50;">🚀 Publish All Drafts</button>
+                  <button id="faq-save-order-btn" class="btn-ghost hidden" style="color: var(--primary-color);">💾 Save Display Order</button>
+                </div>
               </div>
+              
+              <!-- Auto-generate Progress -->
+              <div id="faq-gen-progress-container" class="hidden" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span id="faq-gen-status-text" style="font-weight: 500; color: var(--primary-color);">Starting generation...</span>
+                  <span id="faq-gen-count-text" style="color: var(--text-muted); font-size: 0.9rem;">0 / 0 sources done</span>
+                </div>
+                <div style="width: 100%; background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden;">
+                  <div id="faq-gen-progress-bar" style="width: 0%; background: var(--primary-color); height: 100%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              
               <div id="faqs-loading" class="placeholder-state" style="padding: 1rem;">Loading FAQs…</div>
               <div id="faqs-empty" class="placeholder-state hidden" style="padding: 1rem;">No FAQs defined yet. Create one above.</div>
               <div id="faqs-list" style="display: flex; flex-direction: column; gap: 1rem;">

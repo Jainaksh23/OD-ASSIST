@@ -1824,3 +1824,113 @@ const faqCancelBtn = document.getElementById('faq-cancel-btn');
 if (faqCancelBtn) {
   faqCancelBtn.addEventListener('click', resetFaqForm);
 }
+
+// ── FAQ Filters & Bulk Actions ──────────────────────────────────────────
+
+const faqFilters = document.querySelectorAll('.faq-status-filters .filter-btn');
+faqFilters.forEach(btn => {
+  btn.addEventListener('click', () => {
+    faqFilters.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const filter = btn.dataset.faqFilter;
+    const cards = document.querySelectorAll('#faqs-list .source-card');
+    cards.forEach(card => {
+      const isPublished = card.querySelector('.status-pill').textContent === 'Published';
+      if (filter === 'all') card.style.display = 'flex';
+      else if (filter === 'published') card.style.display = isPublished ? 'flex' : 'none';
+      else if (filter === 'draft') card.style.display = !isPublished ? 'flex' : 'none';
+    });
+  });
+});
+
+const publishAllBtn = document.getElementById('faq-publish-all-btn');
+if (publishAllBtn) {
+  publishAllBtn.addEventListener('click', async () => {
+    if (!confirm('Publish all draft FAQs? They will be visible to users immediately.')) return;
+    try {
+      const res = await fetch(`${API}/admin/faqs/publish-all`, {
+        method: 'POST',
+        headers: auth()
+      });
+      if (res.ok) {
+        toast('All drafts published successfully!', 'success');
+        loadFaqs();
+      }
+    } catch(e) { console.error(e); }
+  });
+}
+
+const autoGenBtn = document.getElementById('faq-auto-gen-btn');
+if (autoGenBtn) {
+  autoGenBtn.addEventListener('click', async () => {
+    if (!confirm('This will scan all completed sources and generate draft FAQs using AI. Review them before publishing. Continue?')) return;
+    
+    const container = document.getElementById('faq-gen-progress-container');
+    const statusText = document.getElementById('faq-gen-status-text');
+    const countText = document.getElementById('faq-gen-count-text');
+    const bar = document.getElementById('faq-gen-progress-bar');
+    
+    container.classList.remove('hidden');
+    bar.style.width = '0%';
+    statusText.textContent = 'Starting generation...';
+    autoGenBtn.disabled = true;
+    
+    try {
+      const res = await fetch(`${API}/admin/faqs/generate-from-sources`, {
+        method: 'POST',
+        headers: auth()
+      });
+      
+      if (!res.ok) throw new Error('Network error');
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\\n\\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              if (data.status === 'starting' || data.status === 'generating') {
+                const pct = data.total > 0 ? (data.progress / data.total) * 100 : 0;
+                bar.style.width = pct + '%';
+                countText.textContent = `${data.progress} / ${data.total} sources done`;
+                if (data.source_title) {
+                  statusText.textContent = `Generating for: ${data.source_title}`;
+                }
+              } else if (data.status === 'completed') {
+                bar.style.width = '100%';
+                countText.textContent = `${data.total} / ${data.total} sources done`;
+                statusText.textContent = 'Generation completed!';
+                setTimeout(() => {
+                  container.classList.add('hidden');
+                  autoGenBtn.disabled = false;
+                  loadFaqs(); // Refresh the list
+                  toast('Draft FAQs generated successfully', 'success');
+                  
+                  // Switch to draft filter view
+                  const draftBtn = document.querySelector('[data-faq-filter="draft"]');
+                  if(draftBtn) draftBtn.click();
+                }, 2000);
+              } else if (data.status === 'error') {
+                statusText.textContent = data.message;
+                autoGenBtn.disabled = false;
+              }
+            } catch(e) {}
+          }
+        }
+      }
+    } catch(e) {
+      console.error(e);
+      statusText.textContent = 'An error occurred';
+      autoGenBtn.disabled = false;
+    }
+  });
+}
