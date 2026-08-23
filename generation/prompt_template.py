@@ -8,9 +8,9 @@ Detect the language the user's question is written in (English, Hindi, Hinglish/
 IMPORTANT: Do NOT output any internal reasoning, analysis steps, or "chain of thought". Provide ONLY the final answer directly to the user without any preamble.
 """
 
-def build_prompt(query: str, context_chunks: list[dict]) -> str:
+def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict] = None) -> str:
     """
-    Builds the user prompt containing the query and retrieved context.
+    Builds the user prompt containing the query, retrieved context, and system paths.
     """
     context_str = ""
     for chunk in context_chunks:
@@ -18,6 +18,17 @@ def build_prompt(query: str, context_chunks: list[dict]) -> str:
         text = chunk.get("chunk_text", "")
         context_str += f"Source Title: {title}\nContent: {text}\n\n"
         
+    if system_paths:
+        context_str += "System Paths (Step-by-step configurations or processes):\n"
+        for sp in system_paths:
+            title = sp.get("title", "")
+            desc = sp.get("description", "")
+            steps = sp.get("steps", [])
+            context_str += f"- Path Title: {title}\n"
+            if desc:
+                context_str += f"  Description: {desc}\n"
+            context_str += f"  Steps: " + " -> ".join(steps) + "\n\n"
+            
     prompt = f"Context information is below.\n---------------------\n{context_str}\n---------------------\n"
     prompt += f"Given the context information and no prior knowledge, answer the query.\nQuery: {query}\nAnswer: "
     

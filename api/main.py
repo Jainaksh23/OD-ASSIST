@@ -718,7 +718,10 @@ def query_bot(
     kw_results = search_keywords(body.query, db, k=20)
     merged = merge_results(vec_results, kw_results, top_k=5)
 
-    gen = generate_answer(body.query, merged, groq_client)
+    merged_source_ids = list(set([chunk["source_id"] for chunk in merged]))
+    system_paths = get_system_paths_for_sources(db, merged_source_ids)
+
+    gen = generate_answer(body.query, merged, groq_client, system_paths=system_paths)
     confidence = determine_confidence(gen["answer"])
 
     # Resolve source metadata for display

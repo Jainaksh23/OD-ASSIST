@@ -23,19 +23,19 @@ def strip_thinking(text: str) -> str:
     
     return text
 
-def generate_answer(query: str, context_chunks: List[Dict], client: Groq) -> Dict[str, Any]:
+def generate_answer(query: str, context_chunks: List[Dict], client: Groq, system_paths: List[Dict] = None) -> Dict[str, Any]:
     """
-    Calls Groq to generate an answer based on the context.
+    Calls Groq to generate an answer based on the context and system paths.
     Returns the answer text and the unique source IDs used.
     """
-    if not context_chunks:
+    if not context_chunks and not system_paths:
         return {
             "answer": "I don't have enough information to answer this confidently.",
             "sources_used": [],
             "raw_response": None
         }
         
-    prompt = build_prompt(query, context_chunks)
+    prompt = build_prompt(query, context_chunks, system_paths)
     
     try:
         response = client.chat.completions.create(
