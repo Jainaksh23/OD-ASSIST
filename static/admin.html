@@ -55,6 +55,7 @@
         <button class="sidebar-nav-btn" data-view="users">👥 Manage Users</button>
         <button class="sidebar-nav-btn" data-view="cache">⚡ Semantic Cache</button>
         <button class="sidebar-nav-btn" data-view="paths">🗺️ System Paths</button>
+        <button class="sidebar-nav-btn" data-view="faqs">❓ Manage FAQs</button>
       </nav>
 
       <div class="sidebar-stats" id="sidebar-stats-section" style="padding: 0 1.5rem 1.25rem; border-bottom: 1px solid var(--border-color); gap: 0.75rem;">
@@ -488,6 +489,93 @@
               <div id="paths-loading" class="placeholder-state" style="padding: 1rem;">Loading system paths…</div>
               <div id="paths-empty" class="placeholder-state hidden" style="padding: 1rem;">No system paths defined yet. Create one above.</div>
               <div id="paths-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+                <!-- Injected dynamically -->
+              </div>
+            </div>
+          </section>
+        </div> <!-- End of System Paths View -->
+
+        <!-- FAQs View -->
+        <div id="view-faqs" class="view-panel hidden">
+          <section id="section-faqs" class="card" style="margin-top: 0; border-left: 4px solid var(--primary-color);">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <div>
+                <h3 class="card-title" style="margin-bottom: 0.2rem;">FAQ Management</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Curate frequently asked questions to appear directly on the user portal.</p>
+              </div>
+            </div>
+
+            <!-- Form & Live Preview Row -->
+            <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 3rem; border-bottom: 1px solid var(--border-color); padding-bottom: 2rem;">
+              <!-- Create/Edit Form -->
+              <div style="flex: 1; min-width: 320px;">
+                <h4 style="margin-bottom: 1.25rem;" id="faq-form-title">Create New FAQ</h4>
+                <form id="faq-form">
+                  <input type="hidden" id="faq-id" value="" />
+                  
+                  <div class="field-group">
+                    <label>Question</label>
+                    <input id="faq-question-input" type="text" placeholder="e.g. How is the fee calculated?" required />
+                  </div>
+                  
+                  <div class="field-group">
+                    <label>Answer</label>
+                    <textarea id="faq-answer-input" rows="4" placeholder="Enter the exact answer to display..." required></textarea>
+                  </div>
+
+                  <div class="field-group">
+                    <label>Category</label>
+                    <select id="faq-category-input" required>
+                      <option value="General">General</option>
+                      <option value="Fees">Fees</option>
+                      <option value="Transport">Transport</option>
+                      <option value="Admissions">Admissions</option>
+                      <option value="Payroll">Payroll</option>
+                    </select>
+                  </div>
+
+                  <div class="field-group">
+                    <label>Linked Knowledge Source (optional)</label>
+                    <select id="faq-source-select" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                      <option value="">None</option>
+                      <!-- Injected via JS -->
+                    </select>
+                  </div>
+
+                  <div class="field-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                    <input type="checkbox" id="faq-published-input" style="width: 18px; height: 18px;" checked />
+                    <label for="faq-published-input" style="margin: 0; font-weight: 500;">Publish to User Portal</label>
+                  </div>
+
+                  <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" id="faq-submit-btn" class="btn-primary" style="flex: 1;">Save FAQ</button>
+                    <button type="button" id="faq-cancel-btn" class="btn-ghost hidden" style="flex: 0.5;">Cancel</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Suggested FAQs -->
+              <div style="flex: 1.2; min-width: 320px; display: flex; flex-direction: column;">
+                <h4 style="margin-bottom: 1.25rem;">Suggested FAQs (From User Queries)</h4>
+                <div style="flex: 1; background: #FAF7F2; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 1.5rem; display: flex; flex-direction: column;">
+                  <div id="faq-suggest-loading" class="placeholder-state" style="padding: 1rem;">Loading suggestions…</div>
+                  <div id="faq-suggest-empty" class="placeholder-state hidden" style="padding: 1rem;">No new suggestions available.</div>
+                  <div id="faq-suggest-list" style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; max-height: 400px;">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Existing FAQs List -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h4>Existing FAQs</h4>
+                <button id="faq-save-order-btn" class="btn-ghost hidden" style="color: var(--primary-color);">💾 Save Display Order</button>
+              </div>
+              <div id="faqs-loading" class="placeholder-state" style="padding: 1rem;">Loading FAQs…</div>
+              <div id="faqs-empty" class="placeholder-state hidden" style="padding: 1rem;">No FAQs defined yet. Create one above.</div>
+              <div id="faqs-list" style="display: flex; flex-direction: column; gap: 1rem;">
                 <!-- Injected dynamically -->
               </div>
             </div>

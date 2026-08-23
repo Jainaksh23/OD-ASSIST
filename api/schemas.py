@@ -93,3 +93,39 @@ class SystemPathCreate(BaseModel):
     description: Optional[str] = None
     steps: List[str]
     source_ids: List[int]
+
+class FAQCreate(BaseModel):
+    question: str
+    answer: str
+    category: Optional[str] = None
+    display_order: Optional[int] = 0
+    linked_source_id: Optional[int] = None
+    is_published: Optional[bool] = False
+
+class FAQUpdate(BaseModel):
+    question: Optional[str] = None
+    answer: Optional[str] = None
+    category: Optional[str] = None
+    display_order: Optional[int] = None
+    linked_source_id: Optional[int] = None
+    is_published: Optional[bool] = None
+
+class FAQResponse(BaseModel):
+    id: int
+    question: str
+    answer: str
+    category: Optional[str] = None
+    display_order: int
+    linked_source_id: Optional[int] = None
+    is_published: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class FAQReorderItem(BaseModel):
+    id: int
+    display_order: int
+
+class FAQReorderRequest(BaseModel):
+    items: List[FAQReorderItem]

@@ -1097,7 +1097,8 @@ function switchView(viewName) {
     'insights': 'Insights & Gaps',
     'users': 'Manage Users',
     'cache': 'Semantic Cache',
-    'paths': 'System Paths'
+    'paths': 'System Paths',
+    'faqs': 'Manage FAQs'
   };
   const headerTitle = document.getElementById('page-header-title');
   if (headerTitle && headerMap[viewName]) {
@@ -1138,6 +1139,10 @@ function switchView(viewName) {
   } else if (viewName === 'paths') {
     loadSourcesForSelect();
     loadPaths();
+  } else if (viewName === 'faqs') {
+    loadFaqs();
+    loadSuggestedFaqs();
+    loadSourcesForFaqSelect();
   }
 }
 
@@ -1549,4 +1554,273 @@ if (pathFormEl) {
       submitBtn.textContent = originalText;
     }
   });
+}
+
+// ── FAQs Section ─────────────────────────────────────────────────────────────
+
+async function loadSourcesForFaqSelect() {
+  const select = document.getElementById('faq-source-select');
+  if (!select) return;
+  if (cachedSources.length === 0) {
+    try {
+      const res = await fetch(`${API}/admin/sources`, { headers: auth() });
+      if (res.ok) cachedSources = await res.json();
+    } catch (e) {
+      console.error("Error loading sources:", e);
+    }
+  }
+  select.innerHTML = '<option value="">None</option>';
+  cachedSources.forEach(src => {
+    const opt = document.createElement('option');
+    opt.value = src.id;
+    opt.textContent = `[#${src.id}] ${src.title || 'Untitled'}`;
+    select.appendChild(opt);
+  });
+}
+
+async function loadFaqs() {
+  const list = document.getElementById('faqs-list');
+  const loading = document.getElementById('faqs-loading');
+  const empty = document.getElementById('faqs-empty');
+  if (!list) return;
+
+  loading.classList.remove('hidden');
+  empty.classList.add('hidden');
+  list.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/admin/faqs`, { headers: auth() });
+    if (res.status === 401) { handleExpiredToken(); return; }
+    const faqs = await res.json();
+    loading.classList.add('hidden');
+    if (!faqs || faqs.length === 0) {
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    faqs.forEach((f, idx) => {
+      const card = document.createElement('div');
+      card.className = 'source-card';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      card.style.gap = '0.75rem';
+      
+      const badgeColor = f.is_published ? 'var(--success)' : 'var(--text-muted)';
+      const badgeText = f.is_published ? 'Published' : 'Draft';
+      
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+          <div style="flex: 1;">
+            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">${esc(f.question)}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">${esc(f.category || 'General')}</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="status-pill" style="background: ${badgeColor}; color: white; padding: 0.2rem 0.5rem; font-size: 0.7rem;">${badgeText}</span>
+            <button class="btn-ghost faq-up-btn" data-id="${f.id}" title="Move Up" style="padding: 0.2rem 0.4rem;">▲</button>
+            <button class="btn-ghost faq-down-btn" data-id="${f.id}" title="Move Down" style="padding: 0.2rem 0.4rem;">▼</button>
+            <button class="btn-ghost faq-edit-btn" data-faq='${esc(JSON.stringify(f))}' title="Edit">✏️</button>
+            <button class="btn-row-del faq-del-btn" data-id="${f.id}" title="Delete">🗑</button>
+          </div>
+        </div>
+        <div style="font-size: 0.9rem; color: var(--text-main); background: rgba(0,0,0,0.02); padding: 0.5rem; border-radius: 4px; border-left: 2px solid var(--border-color);">
+          ${esc(f.answer).replace(/\n/g, '<br>')}
+        </div>
+      `;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('.faq-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const f = JSON.parse(btn.dataset.faq);
+        document.getElementById('faq-id').value = f.id;
+        document.getElementById('faq-question-input').value = f.question;
+        document.getElementById('faq-answer-input').value = f.answer;
+        document.getElementById('faq-category-input').value = f.category || 'General';
+        document.getElementById('faq-source-select').value = f.linked_source_id || '';
+        document.getElementById('faq-published-input').checked = f.is_published;
+        document.getElementById('faq-form-title').textContent = 'Edit FAQ';
+        document.getElementById('faq-cancel-btn').classList.remove('hidden');
+        document.getElementById('faq-submit-btn').textContent = 'Save Changes';
+        document.getElementById('faq-form-title').scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    list.querySelectorAll('.faq-del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this FAQ?')) return;
+        try {
+          await fetch(`${API}/admin/faqs/${btn.dataset.id}`, { method: 'DELETE', headers: auth() });
+          loadFaqs();
+          toast('FAQ deleted', 'success');
+        } catch (e) { toast('Error deleting FAQ', 'error'); }
+      });
+    });
+
+    // Handle local reordering before saving
+    list.querySelectorAll('.faq-up-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        if (idx === 0) return;
+        const currentCard = btn.closest('.source-card');
+        const prevCard = currentCard.previousElementSibling;
+        list.insertBefore(currentCard, prevCard);
+        document.getElementById('faq-save-order-btn').classList.remove('hidden');
+      });
+    });
+    list.querySelectorAll('.faq-down-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        const currentCard = btn.closest('.source-card');
+        const nextCard = currentCard.nextElementSibling;
+        if (!nextCard) return;
+        list.insertBefore(nextCard, currentCard);
+        document.getElementById('faq-save-order-btn').classList.remove('hidden');
+      });
+    });
+
+  } catch (e) {
+    loading.textContent = 'Error loading FAQs.';
+  }
+}
+
+async function loadSuggestedFaqs() {
+  const list = document.getElementById('faq-suggest-list');
+  const loading = document.getElementById('faq-suggest-loading');
+  const empty = document.getElementById('faq-suggest-empty');
+  if (!list) return;
+
+  loading.classList.remove('hidden');
+  empty.classList.add('hidden');
+  list.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/admin/faqs/suggested`, { headers: auth() });
+    if (res.status === 401) { handleExpiredToken(); return; }
+    const items = await res.json();
+    loading.classList.add('hidden');
+    if (!items || items.length === 0) {
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'source-card';
+      card.style.padding = '1rem';
+      card.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-main);">${esc(item.query)}</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Asked ${item.count} times recently</div>
+        <button class="btn-ghost faq-promote-btn" style="width: 100%; border: 1px dashed var(--primary-color); color: var(--primary-color);" data-q="${esc(item.query)}" data-a="${esc(item.answer || '')}">
+          ⭐ Promote to FAQ
+        </button>
+      `;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('.faq-promote-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('faq-id').value = '';
+        document.getElementById('faq-question-input').value = btn.dataset.q;
+        document.getElementById('faq-answer-input').value = btn.dataset.a;
+        document.getElementById('faq-form-title').textContent = 'Create New FAQ';
+        document.getElementById('faq-cancel-btn').classList.add('hidden');
+        document.getElementById('faq-submit-btn').textContent = 'Save FAQ';
+        document.getElementById('faq-form-title').scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  } catch (e) {
+    loading.textContent = 'Error loading suggestions.';
+  }
+}
+
+const faqSaveOrderBtn = document.getElementById('faq-save-order-btn');
+if (faqSaveOrderBtn) {
+  faqSaveOrderBtn.addEventListener('click', async () => {
+    const list = document.getElementById('faqs-list');
+    const items = Array.from(list.querySelectorAll('.faq-up-btn')).map((btn, idx) => ({
+      id: parseInt(btn.dataset.id, 10),
+      display_order: idx
+    }));
+    
+    faqSaveOrderBtn.textContent = 'Saving...';
+    faqSaveOrderBtn.disabled = true;
+    
+    try {
+      await fetch(`${API}/admin/faqs/reorder`, {
+        method: 'POST',
+        headers: { ...auth(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      toast('Display order saved', 'success');
+      faqSaveOrderBtn.classList.add('hidden');
+    } catch (e) {
+      toast('Error saving order', 'error');
+    } finally {
+      faqSaveOrderBtn.textContent = '💾 Save Display Order';
+      faqSaveOrderBtn.disabled = false;
+    }
+  });
+}
+
+function resetFaqForm() {
+  document.getElementById('faq-form-title').textContent = 'Create New FAQ';
+  document.getElementById('faq-id').value = '';
+  document.getElementById('faq-form').reset();
+  const cancelBtn = document.getElementById('faq-cancel-btn');
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+  const submitBtn = document.getElementById('faq-submit-btn');
+  if (submitBtn) submitBtn.textContent = 'Save FAQ';
+}
+
+const faqFormEl = document.getElementById('faq-form');
+if (faqFormEl) {
+  faqFormEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('faq-id').value;
+    const q = document.getElementById('faq-question-input').value.trim();
+    const a = document.getElementById('faq-answer-input').value.trim();
+    const cat = document.getElementById('faq-category-input').value;
+    const src = document.getElementById('faq-source-select').value;
+    const pub = document.getElementById('faq-published-input').checked;
+
+    const payload = {
+      question: q,
+      answer: a,
+      category: cat,
+      linked_source_id: src ? parseInt(src, 10) : null,
+      is_published: pub
+    };
+
+    const method = id ? 'PUT' : 'POST';
+    const endpoint = id ? `${API}/admin/faqs/${id}` : `${API}/admin/faqs`;
+    
+    const submitBtn = document.getElementById('faq-submit-btn');
+    const ogText = submitBtn.textContent;
+    submitBtn.textContent = 'Saving...';
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch(endpoint, {
+        method,
+        headers: { ...auth(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        toast(id ? 'FAQ updated' : 'FAQ created', 'success');
+        resetFaqForm();
+        loadFaqs();
+        loadSuggestedFaqs();
+      } else {
+        toast('Error saving FAQ', 'error');
+      }
+    } catch (e) {
+      toast('Connection error', 'error');
+    } finally {
+      submitBtn.textContent = ogText;
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+const faqCancelBtn = document.getElementById('faq-cancel-btn');
+if (faqCancelBtn) {
+  faqCancelBtn.addEventListener('click', resetFaqForm);
 }

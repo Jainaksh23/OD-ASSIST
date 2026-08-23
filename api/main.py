@@ -49,9 +49,10 @@ from api.auth import (create_access_token, get_current_user, require_admin,
 from api.schemas import (FeedbackRequest, IngestRequest, LoginRequest,
                           QueryRequest, QueryResponse, SourceMetadata,
                           SourceResponse, TokenResponse, BulkIngestRequest, UserCreate, UserResponse,
-                          SystemPathResponse, SystemPathCreate, SystemPathSimpleResponse)
+                          SystemPathResponse, SystemPathCreate, SystemPathSimpleResponse,
+                          FAQCreate, FAQUpdate, FAQResponse, FAQReorderRequest)
 from db.db import SessionLocal, get_db, init_db
-from db.models import QueryLog, QueryCache, Source, User, Chunk, SystemPath, SystemPathStep
+from db.models import QueryLog, QueryCache, Source, User, Chunk, SystemPath, SystemPathStep, FAQ
 from generation.confidence_check import determine_confidence
 from generation.generator import generate_answer
 from ingestion.orchestrator import process_source
@@ -626,6 +627,86 @@ def delete_system_path(
     db.delete(path)
     db.commit()
     return {"message": f"System path {path_id} deleted successfully"}
+
+# ── FAQs ──────────────────────────────────────────────────────────────────────
+
+@app.get("/faqs", response_model=list[FAQResponse], tags=["chat"])
+def get_public_faqs(db: Session = Depends(get_db)):
+    return db.query(FAQ).filter(FAQ.is_published == True).order_by(FAQ.display_order.asc()).all()
+
+@app.get("/admin/faqs", response_model=list[FAQResponse], tags=["admin"])
+def get_admin_faqs(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return db.query(FAQ).order_by(FAQ.display_order.asc()).all()
+
+@app.post("/admin/faqs", response_model=FAQResponse, tags=["admin"])
+def create_faq(body: FAQCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    faq = FAQ(**body.model_dump())
+    db.add(faq)
+    db.commit()
+    db.refresh(faq)
+    return faq
+
+@app.put("/admin/faqs/{faq_id}", response_model=FAQResponse, tags=["admin"])
+def update_faq(faq_id: int, body: FAQUpdate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    faq = db.get(FAQ, faq_id)
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ not found")
+    
+    update_data = body.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(faq, key, value)
+        
+    db.commit()
+    db.refresh(faq)
+    return faq
+
+@app.delete("/admin/faqs/{faq_id}", tags=["admin"])
+def delete_faq(faq_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    faq = db.get(FAQ, faq_id)
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ not found")
+    db.delete(faq)
+    db.commit()
+    return {"message": "FAQ deleted successfully"}
+
+@app.post("/admin/faqs/reorder", tags=["admin"])
+def reorder_faqs(body: FAQReorderRequest, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    for item in body.items:
+        db.execute(text("UPDATE faqs SET display_order = :order WHERE id = :id"), {"order": item.display_order, "id": item.id})
+    db.commit()
+    return {"message": "FAQs reordered successfully"}
+
+@app.get("/admin/faqs/suggested", tags=["admin"])
+def get_suggested_faqs(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    # Find top queries with high confidence that are not already in FAQs (simple check)
+    suggested = (
+        db.query(
+            QueryLog.normalized_query,
+            func.count(QueryLog.id).label("count"),
+            func.max(QueryLog.query).label("example_query"),
+            func.max(QueryLog.answer).label("example_answer")
+        )
+        .filter(QueryLog.confidence == "high")
+        .group_by(QueryLog.normalized_query)
+        .having(func.count(QueryLog.id) >= 2)
+        .order_by(func.count(QueryLog.id).desc())
+        .limit(10)
+        .all()
+    )
+    
+    # Filter out ones that match existing FAQs
+    existing_questions = [f.question.lower() for f in db.query(FAQ).all()]
+    
+    results = []
+    for row in suggested:
+        if row.example_query.lower() not in existing_questions:
+            results.append({
+                "query": row.example_query,
+                "answer": row.example_answer,
+                "count": row.count
+            })
+            
+    return results
 
 
 # ── Chat ──────────────────────────────────────────────────────────────────────

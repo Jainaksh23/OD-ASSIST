@@ -337,3 +337,132 @@ function formatAnswer(text) {
     formatted = formatted.replace(/\n/g, '<br>');
     return formatted;
 }
+
+// ── FAQ Module ─────────────────────────────────────────────────────────────
+
+let allFaqs = [];
+
+async function loadUserFaqs() {
+    const loading = document.getElementById("faq-loading");
+    const empty = document.getElementById("faq-empty");
+    const accordion = document.getElementById("faq-accordion");
+    if (!accordion) return;
+
+    loading.classList.remove("hidden");
+    empty.classList.add("hidden");
+    accordion.classList.add("hidden");
+    accordion.innerHTML = "";
+
+    try {
+        const res = await fetch(`${API_BASE}/faqs`);
+        if (res.ok) {
+            allFaqs = await res.json();
+            renderFaqs(allFaqs);
+        }
+    } catch (e) {
+        console.error("Failed to load FAQs", e);
+        loading.textContent = "Error loading FAQs.";
+    }
+}
+
+function renderFaqs(faqsToRender) {
+    const loading = document.getElementById("faq-loading");
+    const empty = document.getElementById("faq-empty");
+    const accordion = document.getElementById("faq-accordion");
+    
+    loading.classList.add("hidden");
+    
+    if (faqsToRender.length === 0) {
+        accordion.classList.add("hidden");
+        empty.classList.remove("hidden");
+        return;
+    }
+    
+    empty.classList.add("hidden");
+    accordion.classList.remove("hidden");
+    accordion.innerHTML = "";
+    
+    faqsToRender.forEach(f => {
+        const card = document.createElement("div");
+        card.className = "faq-card";
+        card.innerHTML = `
+            <div class="faq-header" onclick="this.parentElement.classList.toggle('open')">
+                <span>${escapeHTML(f.question)}</span>
+                <span class="icon">▼</span>
+            </div>
+            <div class="faq-body">
+                <div class="faq-content">
+                    ${escapeHTML(f.answer).replace(/\n/g, '<br>')}
+                </div>
+                <div class="faq-action">
+                    <button class="faq-ask-btn" onclick="askFaqQuestion('${escapeHTML(f.question).replace(/'/g, "\\'")}')">
+                        Ask Od Assist ⚡
+                    </button>
+                </div>
+            </div>
+        `;
+        accordion.appendChild(card);
+    });
+}
+
+function askFaqQuestion(q) {
+    document.getElementById("toggle-chat-btn").click();
+    queryInput.value = q;
+    chatForm.requestSubmit();
+}
+
+// Mode Toggle Listeners
+const toggleChatBtn = document.getElementById("toggle-chat-btn");
+const toggleFaqBtn = document.getElementById("toggle-faq-btn");
+const faqView = document.getElementById("faq-view");
+const inputBar = document.querySelector(".input-bar");
+
+if (toggleChatBtn && toggleFaqBtn) {
+    toggleChatBtn.addEventListener("click", () => {
+        toggleChatBtn.classList.add("active");
+        toggleFaqBtn.classList.remove("active");
+        faqView.classList.add("hidden");
+        chatBox.classList.remove("hidden");
+        inputBar.classList.remove("hidden");
+        scrollToBottom();
+    });
+
+    toggleFaqBtn.addEventListener("click", () => {
+        toggleFaqBtn.classList.add("active");
+        toggleChatBtn.classList.remove("active");
+        chatBox.classList.add("hidden");
+        inputBar.classList.add("hidden");
+        faqView.classList.remove("hidden");
+        if (allFaqs.length === 0) loadUserFaqs();
+    });
+}
+
+// FAQ Search and Filter
+const faqSearchInput = document.getElementById("faq-search-input");
+const faqCatBtns = document.querySelectorAll(".faq-cat-btn");
+
+function filterFaqs() {
+    const query = faqSearchInput ? faqSearchInput.value.toLowerCase() : "";
+    const activeCatBtn = document.querySelector(".faq-cat-btn.active");
+    const activeCat = activeCatBtn ? activeCatBtn.dataset.cat : "all";
+    
+    const filtered = allFaqs.filter(f => {
+        const matchQ = f.question.toLowerCase().includes(query) || f.answer.toLowerCase().includes(query);
+        const matchC = activeCat === "all" || (f.category || "General") === activeCat;
+        return matchQ && matchC;
+    });
+    
+    renderFaqs(filtered);
+}
+
+if (faqSearchInput) {
+    faqSearchInput.addEventListener("input", filterFaqs);
+}
+
+faqCatBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+        faqCatBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        filterFaqs();
+    });
+});

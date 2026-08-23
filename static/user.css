@@ -972,3 +972,113 @@ body {
     font-size: 1rem;
   }
 }
+
+/* ---------- Navigation / Toggle ---------- */
+.mode-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+.toggle-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.toggle-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+.toggle-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary-accent);
+  border-color: var(--primary-accent);
+}
+
+/* ---------- FAQ Styles ---------- */
+.faq-cat-btn {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.faq-cat-btn.active {
+  background: var(--primary-accent);
+  color: white;
+  border-color: var(--primary-accent);
+}
+
+.faq-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-3d);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.faq-card:hover {
+  box-shadow: var(--shadow-3d-hover);
+  transform: translateY(-2px);
+}
+.faq-header {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.faq-header:hover {
+  background: rgba(0,0,0,0.02);
+}
+.faq-header .icon {
+  transition: transform 0.3s;
+}
+.faq-card.open .faq-header .icon {
+  transform: rotate(180deg);
+}
+.faq-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background: rgba(0,0,0,0.02);
+}
+.faq-card.open .faq-body {
+  max-height: 500px;
+}
+.faq-content {
+  padding: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  line-height: 1.5;
+  border-top: 1px solid var(--border-color);
+}
+.faq-action {
+  padding: 0 1rem 1rem;
+  text-align: right;
+}
+.faq-ask-btn {
+  background: transparent;
+  color: var(--primary-accent);
+  border: 1px dashed var(--primary-accent);
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.faq-ask-btn:hover {
+  background: var(--primary-soft);
+}
