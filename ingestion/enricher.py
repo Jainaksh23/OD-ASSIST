@@ -3,12 +3,12 @@ from generation.generator import strip_thinking
 
 def enrich_chunk(chunk_text: str, client: Groq) -> str:
     """
-    Uses Groq openai/gpt-oss-20b to generate a one-line summary 
+    Uses Groq llama3-8b-8192 to generate a one-line summary 
     of the chunk for BM25 keyword search enhancement.
     """
     try:
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="llama3-8b-8192",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that summarizes technical text. Respond ONLY with the summary, no other text."},
                 {"role": "user", "content": f"Summarize the following text in one short sentence (max 15 words):\n\n{chunk_text}"}
