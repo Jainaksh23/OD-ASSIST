@@ -25,5 +25,8 @@ def extract_text_from_pdf(file_path: str) -> str:
                 extracted = page.extract_text()
                 if extracted:
                     text_content.append(extracted)
+                page.flush_cache()
+                import gc
+                gc.collect()
                     
     return "\n".join(text_content)
