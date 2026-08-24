@@ -61,6 +61,8 @@ from retrieval.hybrid_merge import merge_results
 from retrieval.keyword_search import search_keywords
 from retrieval.vector_search import search_vectors
 
+import tempfile
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
