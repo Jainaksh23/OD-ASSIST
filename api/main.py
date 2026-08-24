@@ -753,7 +753,7 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                 
                 try:
                     response = groq_client.chat.completions.create(
-                        model="openai/gpt-oss-120b",
+                        model="llama3-70b-8192",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
                         max_tokens=1024
