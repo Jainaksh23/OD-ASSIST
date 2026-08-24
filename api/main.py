@@ -22,6 +22,7 @@ Routes:
 import json
 import logging
 import os
+os.environ["OMP_NUM_THREADS"] = "1"  # Limit PyTorch memory/CPU usage
 import shutil
 import threading
 import time
@@ -114,7 +115,7 @@ def _auto_process_pending(embedder, groq_client, stop_event: threading.Event):
 
             if pending_ids:
                 logger.info("Auto-processor: found %d pending sources, processing...", len(pending_ids))
-                with ThreadPoolExecutor(max_workers=2) as pool:
+                with ThreadPoolExecutor(max_workers=1) as pool:
                     futures = {
                         pool.submit(process_source, sid, embedder, groq_client): title
                         for sid, title in pending_ids
@@ -427,7 +428,7 @@ def retry_all_failed(
 
     # Process in a background thread — max 2 concurrent to respect rate limits
     def _bulk_retry_worker(ids, emb, groq):
-        with ThreadPoolExecutor(max_workers=2) as pool:
+        with ThreadPoolExecutor(max_workers=1) as pool:
             futures = [pool.submit(process_source, sid, emb, groq) for sid in ids]
             for f in futures:
                 try:
