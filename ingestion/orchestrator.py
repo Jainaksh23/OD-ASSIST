@@ -21,9 +21,11 @@ from ingestion.pdf_handler import extract_text_from_pdf
 from ingestion.preprocessor import clean_text
 from ingestion.transcriber import extract_and_transcribe_video
 
+import tempfile
+
 logger = logging.getLogger(__name__)
 
-TEMP_DIR = "temp_files"
+TEMP_DIR = os.path.join(tempfile.gettempdir(), "od_assist_temp")
 
 
 def process_source(

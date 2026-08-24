@@ -587,9 +587,12 @@
               
               <!-- Auto-generate Progress -->
               <div id="faq-gen-progress-container" class="hidden" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                   <span id="faq-gen-status-text" style="font-weight: 500; color: var(--primary-color);">Starting generation...</span>
-                  <span id="faq-gen-count-text" style="color: var(--text-muted); font-size: 0.9rem;">0 / 0 sources done</span>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span id="faq-gen-count-text" style="color: var(--text-muted); font-size: 0.9rem;">0 / 0 sources done</span>
+                    <button id="faq-gen-cancel-btn" class="btn-ghost" style="color: #e53935; border: 1px solid #e53935; padding: 0.25rem 0.75rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer;">✕ Cancel</button>
+                  </div>
                 </div>
                 <div style="width: 100%; background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden;">
                   <div id="faq-gen-progress-bar" style="width: 0%; background: var(--primary-color); height: 100%; transition: width 0.3s ease;"></div>

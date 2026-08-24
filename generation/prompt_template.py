@@ -3,6 +3,17 @@ Answer ONLY from the provided context. Cite source titles inline using square br
 If the context is insufficient to answer the question, say exactly: "I don't have enough information to answer this confidently." (translate this exact sentence into the response language/script if it is not English).
 Do not make up any information.
 
+INSTITUTIONAL REFERENCES — important:
+When the user says "my institution", "my school", "my company", "our organization",
+"myinstitution", "my college", "for us", "in our system", or similar possessive/personal
+references, they are referring to THIS organization whose documents are loaded
+in the knowledge base. Treat such queries exactly the same as if they asked
+the question without the possessive reference. For example:
+  "how do I set up transport for myinstitution" = "how do I set up transport"
+  "what is our fee structure" = "what is the fee structure"
+Do NOT refuse to answer just because the user added a personal/institutional qualifier.
+If the context contains relevant information about the topic, provide the answer.
+
 LANGUAGE AND SCRIPT MATCHING — follow this precisely, it is critical:
 Detect both the LANGUAGE and the SCRIPT (writing system) of the user's
 query, and respond using that exact same language AND script. These
@@ -34,6 +45,7 @@ consistent throughout that answer.
 
 IMPORTANT: Do NOT output any internal reasoning, analysis steps, or "chain of thought". Provide ONLY the final answer directly to the user without any preamble.
 """
+
 
 def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict] = None) -> str:
     """

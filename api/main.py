@@ -64,7 +64,7 @@ from retrieval.vector_search import search_vectors
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TEMP_DIR = "temp_files"
+TEMP_DIR = os.path.join(tempfile.gettempdir(), "od_assist_temp")
 AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
 STUCK_THRESHOLD_MINUTES = 15 # sources in "processing" longer than this → mark failed
 CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
@@ -737,7 +737,7 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                 if not chunks:
                     continue
                     
-                combined_text = "\\n\\n".join([c.chunk_text for c in chunks])
+                combined_text = "\n\n".join([c.chunk_text for c in chunks])
                 combined_text = combined_text[:12000] # Fit in context window
                 
                 prompt = (
@@ -745,8 +745,8 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                     "that a real user of this software would naturally ask. Questions should be short and practical. "
                     "Answers should be concise (2-4 sentences), based ONLY on the given content. "
                     "Return EXACTLY as a JSON array of objects with 'question' and 'answer' keys. "
-                    "Do not include any markdown formatting like ```json or any other text.\\n\\n"
-                    f"CONTENT:\\n{combined_text}"
+                    "Do not include any markdown formatting like ```json or any other text.\n\n"
+                    f"CONTENT:\n{combined_text}"
                 )
                 
                 try:
@@ -882,7 +882,8 @@ def query_bot(
         db.refresh(log_entry)
 
         source_ids = [s.id for s in source_metas]
-        system_paths = get_system_paths_for_sources(db, source_ids)
+        # Only show system paths when the answer is relevant (not low confidence)
+        system_paths = get_system_paths_for_sources(db, source_ids) if confidence != "low" else []
 
         return QueryResponse(
             answer=answer,
@@ -947,7 +948,8 @@ def query_bot(
     )
 
     source_ids = [s.id for s in source_metas]
-    system_paths = get_system_paths_for_sources(db, source_ids)
+    # Only show system paths when the answer is relevant (not low confidence)
+    system_paths = get_system_paths_for_sources(db, source_ids) if confidence != "low" else []
 
     return QueryResponse(
         answer=gen["answer"],

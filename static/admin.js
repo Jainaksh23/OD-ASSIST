@@ -1863,6 +1863,28 @@ if (publishAllBtn) {
 
 const autoGenBtn = document.getElementById('faq-auto-gen-btn');
 if (autoGenBtn) {
+  let faqGenAbortController = null;
+
+  // Cancel button handler
+  const cancelBtn = document.getElementById('faq-gen-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      if (faqGenAbortController) {
+        faqGenAbortController.abort();
+        faqGenAbortController = null;
+      }
+      const container = document.getElementById('faq-gen-progress-container');
+      const statusText = document.getElementById('faq-gen-status-text');
+      statusText.textContent = 'Generation cancelled.';
+      setTimeout(() => {
+        container.classList.add('hidden');
+        autoGenBtn.disabled = false;
+        loadFaqs(); // Refresh to show any FAQs generated before cancel
+        toast('FAQ generation cancelled. Already generated FAQs are saved as drafts.', 'info');
+      }, 1500);
+    });
+  }
+
   autoGenBtn.addEventListener('click', async () => {
     if (!confirm('This will scan all completed sources and generate draft FAQs using AI. Review them before publishing. Continue?')) return;
     
@@ -1874,12 +1896,17 @@ if (autoGenBtn) {
     container.classList.remove('hidden');
     bar.style.width = '0%';
     statusText.textContent = 'Starting generation...';
+    countText.textContent = '0 / 0 sources done';
     autoGenBtn.disabled = true;
+
+    // Create abort controller for cancel support
+    faqGenAbortController = new AbortController();
     
     try {
       const res = await fetch(`${API}/admin/faqs/generate-from-sources`, {
         method: 'POST',
-        headers: auth()
+        headers: auth(),
+        signal: faqGenAbortController.signal
       });
       
       if (!res.ok) throw new Error('Network error');
@@ -1892,7 +1919,7 @@ if (autoGenBtn) {
         if (done) break;
         
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\\n\\n');
+        const lines = chunk.split('\n\n');
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -1928,9 +1955,16 @@ if (autoGenBtn) {
         }
       }
     } catch(e) {
+      if (e.name === 'AbortError') {
+        // Cancelled by user — handled in cancel button click
+        return;
+      }
       console.error(e);
       statusText.textContent = 'An error occurred';
       autoGenBtn.disabled = false;
+    } finally {
+      faqGenAbortController = null;
     }
   });
 }
+
