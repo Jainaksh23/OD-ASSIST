@@ -70,7 +70,7 @@ logger = logging.getLogger(__name__)
 TEMP_DIR = os.path.join(tempfile.gettempdir(), "od_assist_temp")
 AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
 STUCK_THRESHOLD_MINUTES = 15 # sources in "processing" longer than this → mark failed
-CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
+CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.90"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "48"))
 
 
@@ -754,7 +754,7 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                 
                 try:
                     response = groq_client.chat.completions.create(
-                        model="llama3-70b-8192",
+                        model="qwen/qwen3.6-27b",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
                         max_tokens=1024
@@ -917,17 +917,26 @@ def query_bot(
 
     elapsed_ms = int((time.perf_counter() - t_start) * 1000)
 
-    # Store in cache for future queries
-    sources_json_str = json.dumps([{"id": s.id, "title": s.title} for s in source_metas])
-    cache_entry = QueryCache(
-        query_text=body.query,
-        query_embedding=query_embedding.tolist(),
-        answer_text=gen["answer"],
-        sources_json=sources_json_str,
-        confidence=confidence,
-        hit_count=0,
+    # Validate answer before caching to prevent cache poisoning
+    answer_text = gen.get("answer", "").strip()
+    is_valid_answer = (
+        bool(answer_text) and
+        answer_text != "An error occurred while generating the answer." and
+        not answer_text.startswith("An error occurred")
     )
-    db.add(cache_entry)
+
+    if is_valid_answer:
+        # Store in cache for future queries
+        sources_json_str = json.dumps([{"id": s.id, "title": s.title} for s in source_metas])
+        cache_entry = QueryCache(
+            query_text=body.query,
+            query_embedding=query_embedding.tolist(),
+            answer_text=gen["answer"],
+            sources_json=sources_json_str,
+            confidence=confidence,
+            hit_count=0,
+        )
+        db.add(cache_entry)
 
     normalized = re.sub(r'\s+', ' ', body.query.lower().strip())
 
