@@ -21,6 +21,7 @@ Routes:
 
 import json
 import logging
+import asyncio
 import os
 os.environ["OMP_NUM_THREADS"] = "1"  # Limit PyTorch memory/CPU usage
 import shutil
@@ -699,20 +700,6 @@ def get_suggested_faqs(admin: User = Depends(require_admin), db: Session = Depen
         .all()
     )
     
-    # Filter out ones that match existing FAQs
-    existing_questions = [f.question.lower() for f in db.query(FAQ).all()]
-    
-    results = []
-    for row in suggested:
-        if row.example_query.lower() not in existing_questions:
-            results.append({
-                "query": row.example_query,
-                "answer": row.example_answer,
-                "count": row.count
-            })
-            
-    return results
-
 @app.post("/admin/faqs/generate-from-sources", tags=["admin"])
 async def generate_faqs_from_sources(request: Request, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     """
@@ -733,6 +720,11 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
         total = len(sources)
         yield f"data: {json.dumps({'status': 'starting', 'total': total, 'progress': 0})}\n\n"
         
+        success_count = 0
+        skip_count = 0
+        fail_count = 0
+        fail_reasons = {}
+
         with SessionLocal() as session:
             for i, source in enumerate(sources):
                 yield f"data: {json.dumps({'status': 'generating', 'progress': i, 'total': total, 'source_title': source.title})}\n\n"
@@ -754,25 +746,69 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                     f"CONTENT:\n{combined_text}"
                 )
                 
+                max_attempts = 3
+                backoff_delays = [5, 10, 20]
+                success = False
+                raw_text = ""
+
+                for attempt in range(max_attempts):
+                    try:
+                        response = groq_client.chat.completions.create(
+                            model="qwen/qwen3.6-27b",
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.2,
+                            max_tokens=1024
+                        )
+                        raw_text = response.choices[0].message.content.strip()
+                        success = True
+                        break # break out of retry loop on success
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        if "429" in error_msg or "too many requests" in error_msg:
+                            if attempt < max_attempts - 1:
+                                delay = backoff_delays[attempt]
+                                logger.warning(f"Groq 429 for source {source.id}, retrying in {delay}s...")
+                                await asyncio.sleep(delay)
+                            else:
+                                logger.error(f"Rate-limit exhausted for source {source.id} after {max_attempts} attempts.")
+                                fail_reasons[source.id] = "Rate-limit exhausted"
+                        else:
+                            logger.error(f"Groq API error for source {source.id}: {e}")
+                            fail_reasons[source.id] = f"API Error: {e}"
+                            break # don't retry non-429 errors
+
+                if not success:
+                    fail_count += 1
+                    session.rollback()
+                    continue
+
+                # Strip markdown if present
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                if raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+                
+                raw_text = raw_text.strip()
+                
+                if not raw_text or raw_text == "":
+                    logger.warning(f"Skipped source {source.id}: empty LLM response")
+                    skip_count += 1
+                    fail_reasons[source.id] = "Empty response"
+                    continue
+
                 try:
-                    response = groq_client.chat.completions.create(
-                        model="qwen/qwen3.6-27b",
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0.2,
-                        max_tokens=1024
-                    )
-                    
-                    raw_text = response.choices[0].message.content.strip()
-                    # Strip markdown if present
-                    if raw_text.startswith("```json"):
-                        raw_text = raw_text[7:]
-                    if raw_text.startswith("```"):
-                        raw_text = raw_text[3:]
-                    if raw_text.endswith("```"):
-                        raw_text = raw_text[:-3]
-                    
-                    qa_pairs = json.loads(raw_text.strip())
-                    
+                    qa_pairs = json.loads(raw_text)
+                    if not isinstance(qa_pairs, list):
+                        raise ValueError("Response is not a JSON array")
+                except Exception as e:
+                    logger.warning(f"Skipped source {source.id}: invalid LLM response JSON ({e})")
+                    skip_count += 1
+                    fail_reasons[source.id] = "Invalid JSON"
+                    continue
+                
+                try:
                     # Guess category
                     cat = "General"
                     title_lower = source.title.lower() if source.title else ""
@@ -781,8 +817,9 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                     elif "admission" in title_lower or "enroll" in title_lower: cat = "Admissions"
                     elif "payroll" in title_lower or "salary" in title_lower: cat = "Payroll"
                     
+                    pairs_added = 0
                     for pair in qa_pairs:
-                        if "question" in pair and "answer" in pair:
+                        if isinstance(pair, dict) and "question" in pair and "answer" in pair:
                             new_faq = FAQ(
                                 question=pair["question"],
                                 answer=pair["answer"],
@@ -792,13 +829,30 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                                 display_order=999 # Append to end
                             )
                             session.add(new_faq)
-                    session.commit()
+                            pairs_added += 1
+                    
+                    if pairs_added > 0:
+                        session.commit()
+                        success_count += 1
+                    else:
+                        logger.warning(f"Skipped source {source.id}: no valid Q&A pairs found in JSON")
+                        skip_count += 1
+                        fail_reasons[source.id] = "No valid Q&A pairs"
+                        session.rollback()
+
                 except Exception as e:
-                    logger.error(f"Error generating FAQ for source {source.id}: {e}")
+                    logger.error(f"Error saving FAQ for source {source.id}: {e}")
+                    fail_reasons[source.id] = "Database error"
+                    fail_count += 1
                     session.rollback()
                     continue
-                    
-        yield f"data: {json.dumps({'status': 'completed', 'total': total, 'progress': total})}\n\n"
+                
+                # Stagger requests by 3-4s (except for the last one)
+                if i < total - 1:
+                    await asyncio.sleep(3.5)
+
+        summary_msg = f"Generated from {success_count} sources. Skipped: {skip_count}. Failed: {fail_count}."
+        yield f"data: {json.dumps({'status': 'complete', 'progress': total, 'total': total, 'message': summary_msg, 'fail_reasons': fail_reasons})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
