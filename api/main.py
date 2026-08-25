@@ -62,6 +62,7 @@ from ingestion.input_router import is_folder_link
 from retrieval.hybrid_merge import merge_results
 from retrieval.keyword_search import search_keywords
 from retrieval.vector_search import search_vectors
+from retrieval.faq_search import search_faqs
 
 import tempfile
 
@@ -820,13 +821,18 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                     pairs_added = 0
                     for pair in qa_pairs:
                         if isinstance(pair, dict) and "question" in pair and "answer" in pair:
+                            # Generate embedding for the new FAQ
+                            text_to_embed = f"Q: {pair['question']}\nA: {pair['answer']}"
+                            emb = embedder.encode(text_to_embed).tolist()
+                            
                             new_faq = FAQ(
                                 question=pair["question"],
                                 answer=pair["answer"],
                                 category=cat,
                                 linked_source_id=source.id,
                                 is_published=False,
-                                display_order=999 # Append to end
+                                display_order=999, # Append to end
+                                embedding=emb
                             )
                             session.add(new_faq)
                             pairs_added += 1
@@ -958,11 +964,13 @@ def query_bot(
     vec_results = search_vectors(body.query, db, embedder, k=20, query_embedding=query_embedding)
     kw_results = search_keywords(body.query, db, k=20)
     merged = merge_results(vec_results, kw_results, top_k=5)
+    
+    faq_results = search_faqs(body.query, db, embedder, k=3, query_embedding=query_embedding)
 
-    merged_source_ids = list(set([chunk["source_id"] for chunk in merged]))
+    merged_source_ids = list(set([chunk["source_id"] for chunk in merged] + [f["source_id"] for f in faq_results if f.get("source_id")]))
     system_paths = get_system_paths_for_sources(db, merged_source_ids)
 
-    gen = generate_answer(body.query, merged, groq_client, system_paths=system_paths)
+    gen = generate_answer(body.query, merged, groq_client, system_paths=system_paths, faqs=faq_results)
     confidence = determine_confidence(gen["answer"])
 
     # Resolve source metadata for display

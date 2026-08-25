@@ -8,10 +8,10 @@ def search_keywords(query: str, db: Session, k: int = 20) -> List[Dict]:
     """
     sql = text("""
         SELECT c.id, c.source_id, c.chunk_text, c.chunk_summary, s.title,
-               ts_rank_cd(c.search_vector, websearch_to_tsquery('english', :query)) AS score
+               ts_rank_cd(c.search_vector, plainto_tsquery('english', :query)) AS score
         FROM chunks c
         JOIN sources s ON c.source_id = s.id
-        WHERE c.search_vector @@ websearch_to_tsquery('english', :query)
+        WHERE c.search_vector @@ plainto_tsquery('english', :query)
         ORDER BY score DESC
         LIMIT :k
     """)

@@ -146,6 +146,8 @@ class FAQ(Base):
     display_order = Column(Integer, default=0)
     linked_source_id = Column(Integer, ForeignKey("sources.id", ondelete="SET NULL"), nullable=True)
     is_published = Column(Boolean, default=False)
+    # 384 for bge-small-en-v1.5
+    embedding = Column(Vector(384), nullable=True) 
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     linked_source = relationship("Source")

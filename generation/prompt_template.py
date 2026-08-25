@@ -48,9 +48,9 @@ IMPORTANT: Do NOT output any internal reasoning, analysis steps, or "chain of th
 """
 
 
-def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict] = None) -> str:
+def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict] = None, faqs: list[dict] = None) -> str:
     """
-    Builds the user prompt containing the query, retrieved context, and system paths.
+    Builds the user prompt containing the query, retrieved context, FAQs, and system paths.
     """
     context_str = ""
     for chunk in context_chunks:
@@ -58,6 +58,13 @@ def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict
         text = chunk.get("chunk_text", "")
         context_str += f"Source Title: {title}\nContent: {text}\n\n"
         
+    if faqs:
+        context_str += "Relevant Frequently Asked Questions (FAQs):\n"
+        for faq in faqs:
+            q = faq.get("question", "")
+            a = faq.get("answer", "")
+            context_str += f"Q: {q}\nA: {a}\n\n"
+            
     if system_paths:
         context_str += "System Paths (Step-by-step configurations or processes):\n"
         for sp in system_paths:
