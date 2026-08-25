@@ -1,0 +1,101 @@
+{
+    "run_timestamp": "2026-08-25 11:32:25",
+    "num_questions": 5,
+    "aggregate_metrics": {
+        "faithfulness": 0.6,
+        "answer_relevancy": 1.0,
+        "precision_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "avg_latency_s": 2.42
+    },
+    "per_question": [
+        {
+            "question": "What are the rules for fee collection?",
+            "answer_snippet": "Based on the provided documents, the fee collection process includes the following key details:\n\n- **Due Dates & Penalties:** Payment due dates are co",
+            "retrieved_source_ids": [
+                117,
+                97
+            ],
+            "expected_source_ids": [
+                117,
+                97
+            ],
+            "faithfulness": 0.0,
+            "answer_relevancy": 1.0,
+            "precision_at_3": 1.0,
+            "recall_at_5": 1.0,
+            "latency_s": 2.56,
+            "cached": true
+        },
+        {
+            "question": "How to set up transport module?",
+            "answer_snippet": "The transport module setup involves creating a session-dependent system. It requires specific data regarding vehicle capacities, with available option",
+            "retrieved_source_ids": [
+                95
+            ],
+            "expected_source_ids": [
+                95
+            ],
+            "faithfulness": 1.0,
+            "answer_relevancy": 1.0,
+            "precision_at_3": 1.0,
+            "recall_at_5": 1.0,
+            "latency_s": 2.59,
+            "cached": true
+        },
+        {
+            "question": "Student admission process",
+            "answer_snippet": "I don't have enough information to answer this confidently.",
+            "retrieved_source_ids": [
+                97
+            ],
+            "expected_source_ids": [
+                97
+            ],
+            "faithfulness": 0.0,
+            "answer_relevancy": 1.0,
+            "precision_at_3": 1.0,
+            "recall_at_5": 1.0,
+            "latency_s": 2.33,
+            "cached": true
+        },
+        {
+            "question": "Can I process payroll automatically?",
+            "answer_snippet": "I don't have enough information to answer this confidently.",
+            "retrieved_source_ids": [
+                95,
+                97,
+                101
+            ],
+            "expected_source_ids": [
+                95,
+                97,
+                101
+            ],
+            "faithfulness": 1.0,
+            "answer_relevancy": 1.0,
+            "precision_at_3": 1.0,
+            "recall_at_5": 1.0,
+            "latency_s": 2.3,
+            "cached": true
+        },
+        {
+            "question": "How to configure GPS?",
+            "answer_snippet": "I don't have enough information to answer this confidently.",
+            "retrieved_source_ids": [
+                116,
+                95
+            ],
+            "expected_source_ids": [
+                116,
+                95
+            ],
+            "faithfulness": 1.0,
+            "answer_relevancy": 1.0,
+            "precision_at_3": 1.0,
+            "recall_at_5": 1.0,
+            "latency_s": 2.31,
+            "cached": true
+        }
+    ]
+}

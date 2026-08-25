@@ -1,0 +1,27 @@
+[
+    {
+        "question": "What are the rules for fee collection?",
+        "expected_answer": "Fees are collected with due dates and penalties for late payment. The process includes configuring fee heads, collection workflows, and concession management.",
+        "expected_source_ids": [117, 97]
+    },
+    {
+        "question": "How to set up transport module?",
+        "expected_answer": "The transport module setup involves creating a session-dependent system with vehicle capacities, routes, stops, and concession groups.",
+        "expected_source_ids": [95]
+    },
+    {
+        "question": "Student admission process",
+        "expected_answer": "Navigate to the Admission module, fill in student details, assign class/section, and complete the registration form.",
+        "expected_source_ids": [97]
+    },
+    {
+        "question": "Can I process payroll automatically?",
+        "expected_answer": "The payroll module allows processing of staff salaries based on attendance records and configured salary structures.",
+        "expected_source_ids": [95, 97, 101]
+    },
+    {
+        "question": "How to configure GPS?",
+        "expected_answer": "GPS configuration requires mapping tracking devices to vehicles in the Transport module settings.",
+        "expected_source_ids": [116, 95]
+    }
+]

@@ -39,7 +39,7 @@ def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, syst
                 {"role": "user", "content": prompt}
             ],
             temperature=0.0,
-            max_tokens=2048
+            max_tokens=1024
         )
         raw_answer = response.choices[0].message.content.strip()
         answer = strip_thinking(raw_answer)

@@ -32,10 +32,22 @@ def init_db():
         conn.execute(text("ALTER TABLE query_logs ADD COLUMN IF NOT EXISTS response_time_ms INTEGER DEFAULT 0;"))
         conn.commit()
 
-    # Ensure ivfflat indexes on embeddings are dropped (to use exact KNN search for small dataset)
+    # Ensure ivfflat indexes on embeddings are dropped
     with engine.connect() as conn:
         conn.execute(text("DROP INDEX IF EXISTS chunks_embedding_idx;"))
         conn.execute(text("DROP INDEX IF EXISTS query_cache_embedding_idx;"))
+        conn.commit()
+
+    # Create HNSW indexes on embeddings (M=16, ef_construction=200 for robust exact-like search)
+    with engine.connect() as conn:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw_idx ON chunks "
+            "USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS query_cache_embedding_hnsw_idx ON query_cache "
+            "USING hnsw (query_embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);"
+        ))
         conn.commit()
 
     # Create GIN index on chunks for full-text keyword search

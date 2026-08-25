@@ -8,15 +8,13 @@ def enrich_chunk(chunk_text: str, client: Groq) -> str:
     """
     try:
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that summarizes technical text. Respond ONLY with the summary, no other text."},
                 {"role": "user", "content": f"Summarize the following text in one short sentence (max 15 words):\n\n{chunk_text}"}
             ],
             temperature=0.0,
-            max_tokens=512,
-            reasoning_effort="low",
-            reasoning_format="hidden"
+            max_tokens=512
         )
         raw_summary = response.choices[0].message.content.strip()
         summary = strip_thinking(raw_summary)
