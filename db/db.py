@@ -12,7 +12,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=3, max_overflow=2)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
@@ -32,32 +32,10 @@ def init_db():
         conn.execute(text("ALTER TABLE query_logs ADD COLUMN IF NOT EXISTS response_time_ms INTEGER DEFAULT 0;"))
         conn.commit()
 
-    # Create ivfflat index on chunks.embedding
+    # Ensure ivfflat indexes on embeddings are dropped (to use exact KNN search for small dataset)
     with engine.connect() as conn:
-        result = conn.execute(text(
-            "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-            "WHERE c.relname = 'chunks_embedding_idx' AND n.nspname = 'public';"
-        )).fetchone()
-        
-        if not result:
-             conn.execute(text(
-                 "CREATE INDEX chunks_embedding_idx ON chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);"
-             ))
-        conn.commit()
-
-    # Create ivfflat index on query_cache.query_embedding
-    with engine.connect() as conn:
-        result = conn.execute(text(
-            "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-            "WHERE c.relname = 'query_cache_embedding_idx' AND n.nspname = 'public';"
-        )).fetchone()
-
-        if not result:
-            # Use a smaller lists value since query_cache will have far fewer rows than chunks
-            conn.execute(text(
-                "CREATE INDEX query_cache_embedding_idx ON query_cache "
-                "USING ivfflat (query_embedding vector_cosine_ops) WITH (lists = 10);"
-            ))
+        conn.execute(text("DROP INDEX IF EXISTS chunks_embedding_idx;"))
+        conn.execute(text("DROP INDEX IF EXISTS query_cache_embedding_idx;"))
         conn.commit()
 
     # Create GIN index on chunks for full-text keyword search
