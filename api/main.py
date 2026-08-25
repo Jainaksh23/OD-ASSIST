@@ -228,8 +228,10 @@ def get_system_paths_for_sources(db: Session, source_ids: List[int]) -> List[dic
     if not source_ids:
         return []
     from db.models import system_path_sources
+    from sqlalchemy.orm import joinedload
     paths = (
         db.query(SystemPath)
+        .options(joinedload(SystemPath.steps))
         .join(system_path_sources, SystemPath.id == system_path_sources.c.system_path_id)
         .filter(system_path_sources.c.source_id.in_(source_ids))
         .distinct()
