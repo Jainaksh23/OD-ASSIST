@@ -967,7 +967,7 @@ def query_bot(
     try:
         translation_prompt = f"Translate the following user query to English. Keep technical terms or names as they are. If it is already in English, just output it exactly as is. Output ONLY the translated query, without quotes or extra text:\n{body.query}"
         trans_res = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="qwen/qwen3.6-27b",
             messages=[{"role": "user", "content": translation_prompt}],
             temperature=0.0,
             max_tokens=60

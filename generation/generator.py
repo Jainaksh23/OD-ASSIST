@@ -33,7 +33,7 @@ def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, syst
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
