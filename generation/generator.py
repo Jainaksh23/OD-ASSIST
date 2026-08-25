@@ -23,25 +23,23 @@ def strip_thinking(text: str) -> str:
     
     return text
 
-def generate_answer(query: str, context_chunks: List[Dict], client: Groq, system_paths: List[Dict] = None) -> Dict[str, Any]:
+def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, system_paths: list[dict] = None) -> dict:
     """
     Calls Groq to generate an answer based on the context and system paths.
     Returns the answer text and the unique source IDs used.
     """
 
-    prompt = build_prompt(query, context_chunks, system_paths)
+    prompt = build_prompt(query, retrieved_chunks, system_paths)
     
     try:
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.0,
-            max_tokens=2048,
-            reasoning_effort="low",
-            reasoning_format="hidden"
+            max_tokens=2048
         )
         raw_answer = response.choices[0].message.content.strip()
         answer = strip_thinking(raw_answer)
@@ -50,7 +48,7 @@ def generate_answer(query: str, context_chunks: List[Dict], client: Groq, system
             answer = "I don't have enough information to answer this confidently."
         
         # Extract unique source IDs from context chunks
-        sources_used = list(set([chunk["source_id"] for chunk in context_chunks]))
+        sources_used = list(set([chunk["source_id"] for chunk in retrieved_chunks]))
         
         return {
             "answer": answer,
