@@ -961,11 +961,30 @@ def query_bot(
         )
 
     # ── CACHE MISS — full RAG pipeline ────────────────────────────────────
-    vec_results = search_vectors(body.query, db, embedder, k=20, query_embedding=query_embedding)
-    kw_results = search_keywords(body.query, db, k=20)
+    search_query = body.query
+    search_query_embedding = query_embedding
+    
+    try:
+        translation_prompt = f"Translate the following user query to English. Keep technical terms or names as they are. If it is already in English, just output it exactly as is. Output ONLY the translated query, without quotes or extra text:\n{body.query}"
+        trans_res = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": translation_prompt}],
+            temperature=0.0,
+            max_tokens=60
+        )
+        translated = trans_res.choices[0].message.content.strip().strip('"\'')
+        if translated and translated.lower() != body.query.lower():
+            search_query = translated
+            search_query_embedding = embedder.encode(search_query)
+            logger.info(f"Translated query: '{body.query}' -> '{search_query}'")
+    except Exception as e:
+        logger.error(f"Translation failed: {e}")
+
+    vec_results = search_vectors(search_query, db, embedder, k=20, query_embedding=search_query_embedding)
+    kw_results = search_keywords(search_query, db, k=20)
     merged = merge_results(vec_results, kw_results, top_k=5)
     
-    faq_results = search_faqs(body.query, db, embedder, k=3, query_embedding=query_embedding)
+    faq_results = search_faqs(search_query, db, embedder, k=3, query_embedding=search_query_embedding)
 
     merged_source_ids = list(set([chunk["source_id"] for chunk in merged] + [f["source_id"] for f in faq_results if f.get("source_id")]))
     system_paths = get_system_paths_for_sources(db, merged_source_ids)
