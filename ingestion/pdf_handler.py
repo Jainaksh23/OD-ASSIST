@@ -10,7 +10,7 @@ import fitz  # PyMuPDF
 import gc
 
 MIN_CHARS_PER_PAGE = 40
-VISION_MODEL = "llama-3.2-11b-vision-preview"
+VISION_MODEL = "qwen/qwen3.6-27b"
 
 
 def extract_text_from_pdf(file_path: str, groq_client=None) -> str:
