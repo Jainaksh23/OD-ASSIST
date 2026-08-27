@@ -399,7 +399,7 @@ function renderSources(sources) {
   filteredSources.forEach(s => {
     const date = s.created_at ? new Date(s.created_at).toLocaleString() : '—';
     const typeLabel = { pdf:'PDF', drive_doc:'Drive Doc', drive_video:'Drive Video', raw_text:'Raw Text' }[s.source_type] || s.source_type;
-    const stClass   = { processing:'processing', completed:'completed', failed:'failed' }[s.status] || '';
+    const stClass   = { pending:'processing', processing:'processing', completed:'completed', failed:'failed' }[s.status] || '';
 
     // Render sidebar item
     const navItem = document.createElement('div');

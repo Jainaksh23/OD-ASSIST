@@ -9,7 +9,7 @@ import pdfplumber
 logger = logging.getLogger(__name__)
 
 # Max pages to OCR (prevents memory/cost blow-up on huge PDFs)
-MAX_OCR_PAGES = 50
+MAX_OCR_PAGES = 25
 
 
 def extract_text_from_pdf(file_path: str, groq_client=None) -> str:
@@ -108,12 +108,16 @@ def _try_vision_ocr(file_path: str, groq_client) -> str:
 
                 # Free pixmap memory immediately
                 del pix
-                gc.collect()
-
+                
                 # Send to Groq Vision for OCR
                 extracted = _ocr_single_page(groq_client, b64_image, page_num + 1, total_pages)
                 if extracted:
                     pages_text.append(extracted)
+
+                # Free heavy string buffers
+                del img_bytes
+                del b64_image
+                gc.collect()
 
                 # Small delay between pages to respect rate limits
                 if page_num < total_pages - 1:

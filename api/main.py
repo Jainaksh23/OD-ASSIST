@@ -300,7 +300,7 @@ async def upload_pdf(
         title=effective_title,
         source_type="pdf",
         source_url=temp_path,   # orchestrator reads from this path
-        status="processing",
+        status="pending",
         file_hash=file_hash,
         ingested_by=admin.id,
     )
@@ -308,13 +308,7 @@ async def upload_pdf(
     db.commit()
     db.refresh(source)
 
-    # process_source creates its own DB session — safe as a background task
-    background_tasks.add_task(
-        process_source,
-        source.id,
-        embedder,
-        groq_client,
-    )
+    # The background auto-processor daemon will pick this up
     return source
 
 
@@ -343,19 +337,14 @@ def ingest_source(
         title=effective_title,
         source_type=body.source_type,
         source_url=body.source_url,
-        status="processing",
+        status="pending",
         ingested_by=admin.id,
     )
     db.add(source)
     db.commit()
     db.refresh(source)
 
-    background_tasks.add_task(
-        process_source,
-        source.id,
-        embedder,
-        groq_client,
-    )
+    # The background auto-processor daemon will pick this up
     return source
 
 
@@ -404,18 +393,13 @@ def retry_source(
 
     db.query(Chunk).filter(Chunk.source_id == source_id).delete()
     
-    source.status = "processing"
+    source.status = "pending"
     source.error_message = None
     source.chunk_count = 0
     db.commit()
     db.refresh(source)
 
-    background_tasks.add_task(
-        process_source,
-        source.id,
-        embedder,
-        groq_client,
-    )
+    # The background auto-processor daemon will pick this up
     return source
 
 
