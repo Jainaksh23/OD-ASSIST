@@ -211,7 +211,12 @@ function setSelectedFile(file) {
   if (!file.name.toLowerCase().endsWith('.pdf')) {
     showBanner('Only PDF files are accepted.', 'error'); return;
   }
-  pdfFilename.textContent = `📄 ${file.name}`;
+  // Max 50MB to prevent crashes on huge PDFs
+  const MAX_PDF_SIZE_MB = 50;
+  if (file.size > MAX_PDF_SIZE_MB * 1024 * 1024) {
+    showBanner(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is ${MAX_PDF_SIZE_MB}MB.`, 'error'); return;
+  }
+  pdfFilename.textContent = `📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
   pdfFilename.classList.remove('hidden');
   pdfSubmit.disabled = false;
 }
@@ -228,14 +233,29 @@ pdfSubmit.addEventListener('click', async () => {
   setLoading(pdfSubmit, pdfBtnLabel, pdfSpinner, true, 'Uploading…');
   hideBanner();
 
-  const ok = await doIngest(`${API}/admin/upload_pdf`, { method: 'POST', headers: auth(), body: fd });
-  setLoading(pdfSubmit, pdfBtnLabel, pdfSpinner, false, 'Ingest PDF');
-  if (ok) {
-    pdfTitle.value = '';
-    pdfFileInput.value = '';
-    pdfFilename.classList.add('hidden');
-    pdfSubmit.disabled = true;
-    showBanner('PDF queued for processing — status will update below.', 'success');
+  try {
+    // 5-minute timeout for large PDF uploads
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+    const ok = await doIngest(`${API}/admin/upload_pdf`, {
+      method: 'POST', headers: auth(), body: fd, signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (ok) {
+      pdfTitle.value = '';
+      pdfFileInput.value = '';
+      pdfFilename.classList.add('hidden');
+      pdfSubmit.disabled = true;
+      showBanner('PDF queued for processing — status will update below.', 'success');
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      showBanner('Upload timed out. Try a smaller PDF or check your connection.', 'error');
+    } else {
+      showBanner('Upload failed: ' + (err.message || 'Unknown error'), 'error');
+    }
+  } finally {
+    setLoading(pdfSubmit, pdfBtnLabel, pdfSpinner, false, 'Ingest PDF');
   }
 });
 

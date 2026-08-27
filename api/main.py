@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 TEMP_DIR = os.path.join(tempfile.gettempdir(), "od_assist_temp")
 AUTO_PROCESS_INTERVAL = 60   # seconds between auto-process checks
 STUCK_THRESHOLD_MINUTES = 15 # sources in "processing" longer than this → mark failed
-CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.90"))
+CACHE_SIMILARITY_THRESHOLD = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "48"))
 
 
@@ -1005,7 +1005,8 @@ def query_bot(
     is_valid_answer = (
         bool(answer_text) and
         answer_text != "An error occurred while generating the answer." and
-        not answer_text.startswith("An error occurred")
+        not answer_text.startswith("An error occurred") and
+        confidence != "low"
     )
 
     if is_valid_answer:

@@ -147,7 +147,7 @@ def _extract_text(source_type: str, source_url: str, groq_client) -> str:
         return source_url or ""
 
     if source_type == "pdf":
-        return extract_text_from_pdf(source_url)
+        return extract_text_from_pdf(source_url, groq_client=groq_client)
 
     if source_type in ("drive_doc", "drive_video"):
         os.makedirs(TEMP_DIR, exist_ok=True)
@@ -160,7 +160,7 @@ def _extract_text(source_type: str, source_url: str, groq_client) -> str:
             else:
                 # drive_doc: try PDF extraction, fallback to plain text read
                 try:
-                    return extract_text_from_pdf(local_path)
+                    return extract_text_from_pdf(local_path, groq_client=groq_client)
                 except Exception:
                     with open(local_path, "r", encoding="utf-8", errors="replace") as f:
                         return f.read()
