@@ -30,6 +30,7 @@ def init_db():
         conn.execute(text("ALTER TABLE query_logs ADD COLUMN IF NOT EXISTS normalized_query TEXT;"))
         conn.execute(text("ALTER TABLE query_logs ADD COLUMN IF NOT EXISTS cached BOOLEAN DEFAULT FALSE;"))
         conn.execute(text("ALTER TABLE query_logs ADD COLUMN IF NOT EXISTS response_time_ms INTEGER DEFAULT 0;"))
+        conn.execute(text("ALTER TABLE sources ADD COLUMN IF NOT EXISTS file_hash VARCHAR(64);"))
         conn.commit()
 
     # Ensure ivfflat indexes on embeddings are dropped

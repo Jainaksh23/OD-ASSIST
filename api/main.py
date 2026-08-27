@@ -21,6 +21,7 @@ Routes:
 
 import json
 import logging
+import hashlib
 import asyncio
 import os
 os.environ["OMP_NUM_THREADS"] = "1"  # Limit PyTorch memory/CPU usage
@@ -280,10 +281,19 @@ async def upload_pdf(
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
+    hasher = hashlib.sha256()
+    file_bytes = await file.read()
+    hasher.update(file_bytes)
+    file_hash = hasher.hexdigest()
+
+    existing = db.query(Source).filter(Source.file_hash == file_hash).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"A PDF with this exact content has already been uploaded as '{existing.title}'.")
+
     safe_name = f"pdf_{os.urandom(8).hex()}.pdf"
     temp_path = os.path.join(TEMP_DIR, safe_name)
     with open(temp_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(file_bytes)
 
     effective_title = title.strip() or file.filename or "Uploaded PDF"
     source = Source(
@@ -291,6 +301,7 @@ async def upload_pdf(
         source_type="pdf",
         source_url=temp_path,   # orchestrator reads from this path
         status="processing",
+        file_hash=file_hash,
         ingested_by=admin.id,
     )
     db.add(source)
@@ -365,8 +376,14 @@ def delete_source(
     source = db.get(Source, source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    db.delete(source)
-    db.commit()
+        
+    try:
+        db.delete(source)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
     return {"message": f"Source {source_id} and all its chunks deleted"}
 
 

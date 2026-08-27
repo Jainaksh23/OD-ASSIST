@@ -35,6 +35,7 @@ class Source(Base):
     status = Column(String(20), default="processing")  # 'processing' | 'completed' | 'failed'
     error_message = Column(Text)      # populated on failure, null on success
     chunk_count = Column(Integer, default=0)
+    file_hash = Column(String(64), index=True, nullable=True) # SHA256 content hash for deduplication
     ingested_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(

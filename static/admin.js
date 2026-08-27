@@ -556,7 +556,8 @@ modalConfirm.addEventListener('click', async () => {
       toast('Source deleted successfully.', 'success');
       fetchSources();
     } else {
-      toast('Failed to delete source.', 'error');
+      const err = await res.json().catch(() => ({}));
+      toast(`Failed to delete source: ${err.detail || 'Unknown error'}`, 'error');
     }
   } catch { toast('Network error.', 'error'); }
 });
