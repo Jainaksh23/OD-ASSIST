@@ -379,7 +379,12 @@ function renderSources(sources) {
 
   const filteredSources = currentSourceFilter === 'all' 
     ? sources 
-    : sources.filter(s => s.status === currentSourceFilter);
+    : sources.filter(s => {
+        if (currentSourceFilter === 'processing') {
+          return s.status === 'processing' || s.status === 'pending';
+        }
+        return s.status === currentSourceFilter;
+      });
 
   if (!filteredSources || filteredSources.length === 0) {
     sourcesEmpty.textContent = currentSourceFilter === 'all' 

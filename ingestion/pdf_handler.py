@@ -1,199 +1,91 @@
-import base64
-import logging
-import gc
-import time
+"""
+ingestion/pdf_handler.py — with vision fallback for graphic-heavy PDFs
+(Canva exports, infographic-style step guides, scanned documents).
+"""
 
+import base64
 from pypdf import PdfReader
 import pdfplumber
+import fitz  # PyMuPDF
+import gc
 
-logger = logging.getLogger(__name__)
-
-# Max pages to OCR (prevents memory/cost blow-up on huge PDFs)
-MAX_OCR_PAGES = 25
+MIN_CHARS_PER_PAGE = 40
+VISION_MODEL = "llama-3.2-11b-vision-preview"
 
 
 def extract_text_from_pdf(file_path: str, groq_client=None) -> str:
-    """
-    Extracts text from a PDF file using a 3-tier strategy:
-      1. pypdf  (fast, text-layer PDFs)
-      2. pdfplumber (fallback for complex layouts)
-      3. Groq Vision OCR (for image-based / Canva PDFs)
+    text_content = []
+    num_pages = 0
 
-    If tiers 1 & 2 return empty text and a groq_client is provided,
-    converts each page to an image and sends it to Groq's vision
-    model for OCR.
-    """
-    text_content = _try_pypdf(file_path)
-
-    if not text_content.strip():
-        text_content = _try_pdfplumber(file_path)
-
-    if not text_content.strip() and groq_client:
-        logger.info("pypdf and pdfplumber returned empty — trying Groq Vision OCR for: %s", file_path)
-        text_content = _try_vision_ocr(file_path, groq_client)
-
-    return text_content
-
-
-def _try_pypdf(file_path: str) -> str:
-    """Tier 1: Extract text using pypdf."""
     try:
         reader = PdfReader(file_path)
-        pages = []
+        num_pages = len(reader.pages)
         for page in reader.pages:
             extracted = page.extract_text()
             if extracted:
-                pages.append(extracted)
-        return "\n".join(pages)
-    except Exception as e:
-        logger.warning("pypdf extraction failed: %s", e)
-        return ""
-
-
-def _try_pdfplumber(file_path: str) -> str:
-    """Tier 2: Extract text using pdfplumber (better for tables)."""
-    try:
-        pages = []
+                text_content.append(extracted)
+        if not "".join(text_content).strip():
+            raise ValueError("pypdf extracted empty text")
+    except Exception:
+        text_content = []
         with pdfplumber.open(file_path) as pdf:
+            num_pages = len(pdf.pages)
             for page in pdf.pages:
                 extracted = page.extract_text()
                 if extracted:
-                    pages.append(extracted)
+                    text_content.append(extracted)
                 page.flush_cache()
-                gc.collect()
-        return "\n".join(pages)
-    except Exception as e:
-        logger.warning("pdfplumber extraction failed: %s", e)
-        return ""
+            gc.collect()
+
+    combined = "\n".join(text_content)
+    too_sparse = num_pages > 0 and len(combined.strip()) < MIN_CHARS_PER_PAGE * num_pages
+
+    if too_sparse and groq_client is not None:
+        vision_text = _extract_via_vision(file_path, groq_client)
+        if vision_text and len(vision_text.strip()) > len(combined.strip()):
+            return vision_text
+
+    return combined
 
 
-def _try_vision_ocr(file_path: str, groq_client) -> str:
-    """
-    Tier 3: Convert PDF pages to images via PyMuPDF, then use Groq
-    Vision model to extract text from each page image.
+def _extract_via_vision(file_path: str, groq_client) -> str:
+    doc = fitz.open(file_path)
+    page_texts = []
 
-    Handles rate limits with exponential backoff.
-    """
-    try:
-        import pymupdf as fitz  # PyMuPDF
-    except ImportError:
-        logger.error("PyMuPDF not installed — cannot do Vision OCR. pip install PyMuPDF")
-        return ""
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        pix = page.get_pixmap(dpi=100)
+        img_bytes = pix.tobytes("png")
+        b64_img = base64.b64encode(img_bytes).decode("utf-8")
+        
+        del pix
 
-    pages_text = []
-
-    try:
-        doc = fitz.open(file_path)
-        total_pages = min(len(doc), MAX_OCR_PAGES)
-
-        if len(doc) > MAX_OCR_PAGES:
-            logger.warning(
-                "PDF has %d pages, only OCR-ing first %d to prevent cost/memory issues",
-                len(doc), MAX_OCR_PAGES,
-            )
-
-        for page_num in range(total_pages):
-            try:
-                page = doc[page_num]
-                # Render at 150 DPI — good balance of quality vs size
-                # (Canva PDFs are usually simple layouts)
-                mat = fitz.Matrix(150 / 72, 150 / 72)
-                pix = page.get_pixmap(matrix=mat)
-
-                # Convert to PNG bytes
-                img_bytes = pix.tobytes("png")
-
-                # Base64 encode for Groq Vision API
-                b64_image = base64.b64encode(img_bytes).decode("utf-8")
-
-                # Free pixmap memory immediately
-                del pix
-                
-                # Send to Groq Vision for OCR
-                extracted = _ocr_single_page(groq_client, b64_image, page_num + 1, total_pages)
-                if extracted:
-                    pages_text.append(extracted)
-
-                # Free heavy string buffers
-                del img_bytes
-                del b64_image
-                gc.collect()
-
-                # Small delay between pages to respect rate limits
-                if page_num < total_pages - 1:
-                    time.sleep(1.0)
-
-            except Exception as e:
-                logger.warning("Vision OCR failed for page %d: %s", page_num + 1, e)
-                continue
-
-        doc.close()
-
-    except Exception as e:
-        logger.error("Failed to open PDF for Vision OCR: %s", e)
-        return ""
-
-    result = "\n\n".join(pages_text)
-    if result.strip():
-        logger.info("Vision OCR extracted %d characters from %d pages", len(result), len(pages_text))
-    return result
-
-
-def _ocr_single_page(groq_client, b64_image: str, page_num: int, total_pages: int) -> str:
-    """
-    Sends a single page image to Groq Vision for text extraction.
-    Retries up to 3 times with exponential backoff on rate-limit errors.
-    """
-    max_retries = 3
-    backoff_delays = [5, 10, 20]
-
-    prompt = (
-        "Extract ALL text visible in this image. This is a page from a PDF document. "
-        "Preserve the original structure — headings, bullet points, numbered lists, tables. "
-        "If text is in Hindi or Hinglish, keep it as-is. "
-        "Output ONLY the extracted text, nothing else. No commentary."
-    )
-
-    for attempt in range(max_retries):
         try:
             response = groq_client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{b64_image}",
-                                },
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt,
-                            },
-                        ],
-                    }
-                ],
-                temperature=0.1,
-                max_tokens=2048,
+                model=VISION_MODEL,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": (
+                            "Transcribe all visible text on this document page, in reading order. "
+                            "If it's a step-by-step guide, list every numbered step with its full label. "
+                            "Include text inside icons, callout boxes, and diagrams. "
+                            "Output only the transcribed content — no commentary, no markdown."
+                        )},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64_img}"}},
+                    ],
+                }],
+                temperature=0.0,
+                max_tokens=1024,
             )
-            text = response.choices[0].message.content.strip()
-            logger.info("  OCR page %d/%d: %d chars extracted", page_num, total_pages, len(text))
-            return text
-
+            page_texts.append(response.choices[0].message.content.strip())
         except Exception as e:
-            error_msg = str(e).lower()
-            if ("429" in error_msg or "too many requests" in error_msg) and attempt < max_retries - 1:
-                delay = backoff_delays[attempt]
-                logger.warning(
-                    "  Rate-limited on page %d, retrying in %ds (attempt %d/%d)...",
-                    page_num, delay, attempt + 1, max_retries,
-                )
-                time.sleep(delay)
-            else:
-                logger.error("  Vision OCR failed for page %d: %s", page_num, e)
-                return ""
+            print(f"Vision extraction failed for page {page_num}: {e}")
+            
+        del img_bytes
+        del b64_img
+        gc.collect()
 
-    return ""
+    doc.close()
+    return "\n\n".join(page_texts)
 

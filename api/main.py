@@ -160,7 +160,7 @@ async def lifespan(app: FastAPI):
     if stuck:
         for s in stuck:
             s.status = "failed"
-            s.error_message = "Access Denied"
+            s.error_message = "Interrupted by server restart — click Retry to resume."
         db.commit()
         logger.info(f"Marked {len(stuck)} stuck 'processing' sources as 'failed'.")
     db.close()
