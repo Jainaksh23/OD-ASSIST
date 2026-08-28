@@ -1,69 +1,156 @@
 # ⚡ OD Assist (Okie Dokie Knowledge Portal)
 
-**OD Assist** is an advanced, AI-powered Retrieval-Augmented Generation (RAG) chatbot tailored for organizational knowledge management. It serves as a centralized "brain" that instantly answers staff and student questions by searching through your organization's internal documents, policies, and training materials.
+**OD Assist** is an enterprise-grade, AI-powered Retrieval-Augmented Generation (RAG) system tailored for organizational knowledge management. It serves as a centralized "brain" that instantly answers staff and student questions by securely searching through internal documents, policies, and training materials.
 
 ---
 
 ## 🎯 The Problem It Solves
 
-Organizations often face fragmented knowledge scattered across policy PDFs, Google Drive Docs, Town Hall recordings, and HR memos. When employees or students have a question (e.g., *"What is the student promotion process?"* or *"How is payroll processed?"*), they either spend hours searching through folders or interrupt colleagues. 
+Organizations often face fragmented knowledge scattered across policy PDFs, Google Drive Docs, Town Hall recordings, and HR memos. When employees or students have a question, they either spend hours searching through folders or interrupt colleagues. 
 
 **OD Assist solves this by:**
 1. **Unifying Data**: Providing a simple Admin Portal to ingest PDFs, Google Drive links, Video Recordings, and Raw Text into a single database.
-2. **Instant, Accurate Answers**: Users can ask questions in natural language and get immediate answers.
+2. **Instant, Accurate Answers**: Users can ask questions in natural language and get immediate, context-aware answers.
 3. **Eliminating AI Hallucinations**: By strictly using the RAG architecture, the AI is constrained to answer *only* using the provided organizational documents.
-4. **Transparent Citations**: Every answer comes with exact source citations, allowing users to verify the information.
+4. **Transparent Citations & Workflows**: Every answer comes with exact source citations, and when a step-by-step process is detected, it renders interactive workflow diagrams (System Paths).
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 🏗️ System Architecture
 
-OD Assist is built for speed, accuracy, and ease of deployment. 
+OD Assist uses a modern, serverless-ready architecture optimized for speed, precision, and low operational costs.
 
-### Backend & Core Logic
-* **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python) — Ensures high performance and asynchronous request handling.
-* **Database**: [PostgreSQL (Neon Serverless)](https://neon.tech/) — Cloud-native Postgres.
-* **Vector Store**: `pgvector` extension for efficient cosine-similarity search.
-* **ORM**: SQLAlchemy.
-* **Semantic Query Cache**: Store and match query-answer pairs using vector similarity to bypass the LLM for repeated queries, providing sub-100ms responses.
+```mermaid
+graph TD
+    subgraph Frontend
+        U[User Chat Interface]
+        A[Admin Dashboard]
+    end
 
-### AI & Machine Learning
-* **Embeddings**: `sentence-transformers` (`BAAI/bge-small-en-v1.5`) — Runs locally for fast, cost-effective document chunk vectorization.
-* **LLM Engine**: [Groq API](https://groq.com/) (`openai/gpt-oss-120b`) — Provides blazing-fast inference for answer generation.
-* **Audio Transcription**: Groq Whisper API (`whisper-large-v3`) — Automatically extracts and transcribes audio from Google Drive video links.
-* **Search Engine**: **Hybrid Search** — Combines dense Vector Search with sparse Keyword Search (BM25) to ensure the highest retrieval accuracy.
+    subgraph Backend - FastAPI
+        API[FastAPI Router]
+        Auth[JWT Authentication]
+        Cache[Semantic Query Cache]
+        Ingest[Ingestion Pipeline]
+        Search[Hybrid Search Engine]
+    end
 
-### Frontend & Admin Dashboard
-* **UI**: Vanilla HTML, CSS (Design Tokens, CSS Variables), and JavaScript.
-* **Design**: Fully responsive, glassmorphism aesthetics, integrated Dark/Light modes.
-* **Tabbed Admin Panel**: Easy sidebar-based navigation between:
-  - **Dashboard**: High-level metrics, query count trends, feedback analysis, and citation statistics.
-  - **Knowledge Base**: PDF uploads, Google Drive/Folder ingestions, text snippets, and source status tracker.
-  - **Users**: Admin user management.
-  - **Feedbacks**: Detailed log of user upvotes/downvotes and specific user feedback.
-  - **Semantic Cache**: Real-time stats (hit rate, average response times), cached items list with hit counters, and manual cache flushing.
-  - **System Paths**: Build dynamic visual navigation flows (rounded boxes and arrows) linked to specific knowledge sources, which automatically render in the user's chatbot interface when relevant topics are queried.
+    subgraph Database - Neon Serverless
+        PG[(PostgreSQL)]
+        VEC[pgvector Extension]
+    end
+
+    subgraph AI Services
+        Emb[Sentence Transformers<br>BAAI/bge-small-en-v1.5]
+        Groq[Groq Cloud API]
+        LLM[Qwen 3.6 27B Reasoning]
+        Whisper[Whisper Large V3]
+    end
+
+    U --> API
+    A --> Auth --> API
+    API --> Cache
+    Cache -- Miss --> Search
+    Search --> PG
+    Search --> VEC
+    Search --> Groq
+    Groq --> LLM
+    API --> Ingest
+    Ingest --> Emb
+    Ingest --> Whisper
+    Emb --> VEC
+```
 
 ---
 
-## ⚙️ How It Works (Implementation Flow)
+## ⚙️ Core Data Pipelines
 
-1. **Ingestion (Admin Portal)**:
-   - An authorized Admin securely logs in and uploads a knowledge source (PDF, Google Drive Document, Drive Video, or Raw Text).
-2. **Background Processing**:
-   - The app fetches and parses the file (extracting text from PDFs, downloading and transcribing Drive Videos via Whisper).
-   - The text is chunked into manageable pieces (with overlap to preserve context).
-   - The embedding model converts these chunks into dense vector representations.
-   - Vectors and metadata are stored in the Neon PostgreSQL database.
-3. **Semantic Cache Lookup**:
-   - When a user asks a question, the query is vectorized and compared against cached queries in the database using `pgvector` similarity search.
-   - **Cache Hit**: If a highly similar query (default threshold: 95%) is found and is within the TTL (default: 48 hours), the system retrieves the answer instantly from the cache (~50-100ms response time), bypassing the LLM entirely.
-   - **Cache Miss**: If no match is found, the system proceeds with Retrieval & Generation, then stores the new query, response, source metadata, and embedding into the cache for future hits.
-   - **Auto-Flush**: Ingesting a new source automatically flushes the cache to ensure subsequent answers reflect the latest documents.
-4. **Retrieval & Generation (On Cache Miss)**:
-   - The system performs a hybrid search to find the top most relevant chunks from the database.
-   - The LLM (Llama 3 via Groq) receives the user's question alongside the retrieved context chunks and generates a precise answer.
-   - The UI displays the answer, a confidence score, clickable source citations, and automatically renders a beautiful visual **System Path** flow diagram if the cited source contains step-by-step navigation logic.
+### 1. The Ingestion Pipeline
+When an administrator uploads a document, the system processes it intelligently to extract and index the maximum amount of contextual information.
+
+```mermaid
+flowchart TD
+    Start[Admin Uploads File] --> Router{File Type?}
+    
+    Router -- Google Drive / Text --> TextExtractor[Extract Raw Text]
+    Router -- Video / Audio --> AudioExt[Extract Audio] --> Whisper[Groq Whisper Transcription]
+    Router -- PDF Document --> PDFReader{Is Scanned / Image-heavy?}
+    
+    PDFReader -- No --> PyPDF[Standard Text Extraction]
+    PDFReader -- Yes --> VisionAPI[Groq Vision API Fallback]
+    
+    TextExtractor --> Chunker
+    Whisper --> Chunker
+    PyPDF --> Chunker
+    VisionAPI --> Chunker
+    
+    Chunker[LangChain Recursive Splitter<br>600 chars, 90 overlap] --> Enricher
+    
+    Enricher[AI Semantic Summarizer<br>Generates 1-sentence summary per chunk] --> Embedder
+    
+    Embedder[Local Embedding Model<br>BAAI/bge-small-en] --> DB[(PostgreSQL + pgvector)]
+```
+
+### 2. The Retrieval & Generation Pipeline
+When a user asks a question, OD Assist ensures low-latency and highly relevant answers using Semantic Caching and Hybrid Search.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant System as OD Assist Backend
+    participant DB as PostgreSQL
+    participant Groq as Groq AI (Qwen)
+    
+    User->>System: "How to add alumni?"
+    System->>System: Encode query to Vector
+    
+    System->>DB: Check Semantic Cache (Similarity > 0.95)
+    alt Cache Hit
+        DB-->>System: Return cached answer
+        System-->>User: Sub-100ms Response
+    else Cache Miss
+        System->>Groq: Translate query if non-English
+        Groq-->>System: English Query
+        
+        System->>DB: 1. Vector Search (pgvector)
+        System->>DB: 2. Keyword Search (BM25)
+        System->>DB: 3. FAQ Exact Match Search
+        
+        DB-->>System: Top relevant chunks
+        
+        System->>Groq: Prompt LLM with Chunks + Query
+        Groq-->>System: Generated Answer (with filtered reasoning)
+        
+        System->>DB: Save to Semantic Cache
+        System-->>User: Return Answer & Citations
+    end
+```
+
+---
+
+## ✨ Key Features & Technical Highlights
+
+* **Reasoning AI Model**: Powered by Groq's blazing-fast inference using `qwen/qwen3.6-27b`. The system parses and filters the model's complex `<think>` reasoning blocks to provide users with direct, highly-intelligent answers.
+* **Hybrid Search (Dense + Sparse)**: Combines standard vector similarity search with BM25 keyword search to ensure both contextual meaning and exact technical terms are retrieved accurately.
+* **Intelligent Vision Fallback**: Standard PDF extractors fail on scanned documents and infographics. OD Assist automatically detects sparse text and routes image-heavy pages through a Vision LLM for perfect OCR and structural transcription.
+* **Semantic Query Caching**: To save API costs and reduce latency, queries are matched against a vector cache. Semantically identical questions (e.g., "What is the fee?" vs "How much is the fee?") instantly return cached results in <100ms.
+* **Multilingual Translation Routing**: Hindi and Hinglish queries are instantly translated to English under-the-hood before searching the database, drastically improving retrieval recall for non-English users.
+* **Auto-FAQ Generation**: Admins can automatically parse ingested documents to generate interactive Frequently Asked Questions using AI.
+* **System Paths**: Dynamic visual navigation flows (rounded boxes and arrows) linked to specific knowledge sources, which automatically render in the user's chatbot interface when relevant topics are queried.
+
+---
+
+## 🛠️ Tech Stack
+
+* **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python)
+* **Database**: [PostgreSQL (Neon Serverless)](https://neon.tech/) with `pgvector`
+* **AI Engine**: [Groq API](https://groq.com/)
+    * *Reasoning/Generation*: `qwen/qwen3.6-27b`
+    * *Audio Transcription*: `whisper-large-v3`
+* **Embeddings**: `sentence-transformers` (`BAAI/bge-small-en-v1.5`)
+* **Chunking**: LangChain `RecursiveCharacterTextSplitter`
+* **Document Parsers**: `pypdf`, `pdfplumber`, `PyMuPDF` (fitz)
+* **Frontend**: Vanilla HTML, CSS (Glassmorphism, Dark/Light modes), JavaScript
 
 ---
 
@@ -72,11 +159,11 @@ OD Assist is built for speed, accuracy, and ease of deployment.
 ### 1. Database Setup
 1. Create a free project on [Neon](https://neon.tech/).
 2. Copy the **pooled** connection string.
-3. **Crucial**: Open the Neon SQL Editor and run `CREATE EXTENSION IF NOT EXISTS vector;` to enable the pgvector extension.
+3. Open the Neon SQL Editor and run `CREATE EXTENSION IF NOT EXISTS vector;` to enable the pgvector extension.
 
 ### 2. API Keys
 1. Create a free account at [Groq Console](https://console.groq.com/).
-2. Generate an API key. This single key handles both the Llama 3 generation and Whisper transcription.
+2. Generate an API key. This single key handles all generation, summarization, and transcription tasks.
 
 ### 3. Environment Variables
 Create a `.env` file in the root directory (use `.env.example` as a template):
@@ -88,7 +175,7 @@ ADMIN_PASSWORD=YourSecurePassword123
 ADMIN_BASIC_AUTH_USER=admin
 ADMIN_BASIC_AUTH_PASS=YourSecureAdminAuthPass
 
-# Optional Semantic Cache Configuration
+# Optional Cache Configuration
 CACHE_SIMILARITY_THRESHOLD=0.95
 CACHE_TTL_HOURS=48
 ```
@@ -106,9 +193,9 @@ pip install -r requirements.txt
 ```
 
 ### 5. Initialize the System
-Run the admin seeder to create your initial admin account (using credentials from `.env`):
+Run the admin seeder to create your initial admin account:
 ```bash
-python seed_admin.py
+python scripts/seed_admin.py
 ```
 
 ### 6. Run Locally
@@ -116,9 +203,8 @@ Start the FastAPI server:
 ```bash
 uvicorn api.main:app --reload --port 7860
 ```
-- Navigate to `http://localhost:7860/` to see the Landing Page.
-- Choose **Admin Portal**, log in, and ingest your first PDF.
-- Choose **User Portal** to test asking questions against the uploaded PDF.
+- Navigate to `http://localhost:7860/` for the User Panel.
+- Navigate to `http://localhost:7860/admin` for the Admin Dashboard.
 
 ### 7. Deployment (Render Free Tier)
 This app is fully compatible with Render's Docker environment.
