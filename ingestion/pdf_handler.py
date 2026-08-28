@@ -12,7 +12,7 @@ import time
 import re
 
 MIN_CHARS_PER_PAGE = 40
-VISION_MODEL = "qwen/qwen3.6-27b"
+VISION_MODEL = "qwen/qwen3.8-27b"
 
 
 def extract_text_from_pdf(file_path: str, groq_client=None) -> str:

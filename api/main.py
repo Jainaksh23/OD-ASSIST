@@ -757,7 +757,7 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
                     try:
                         from generation.generator import strip_thinking
                         response = groq_client.chat.completions.create(
-                            model="qwen/qwen3.6-27b",
+                            model="qwen/qwen3.8-27b",
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.2,
                             max_tokens=2048
@@ -971,7 +971,7 @@ def query_bot(
         from generation.generator import strip_thinking
         translation_prompt = f"Translate the following user query to English. Keep technical terms or names as they are. If it is already in English, just output it exactly as is. Output ONLY the translated query, without quotes or extra text:\n{body.query}"
         trans_res = groq_client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="qwen/qwen3.8-27b",
             messages=[{"role": "user", "content": translation_prompt}],
             temperature=0.0,
             max_tokens=1024

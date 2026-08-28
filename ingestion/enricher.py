@@ -8,7 +8,7 @@ def enrich_chunk(chunk_text: str, client: Groq) -> str:
     """
     try:
         response = client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that summarizes technical text. Respond ONLY with the summary, no other text."},
                 {"role": "user", "content": f"Summarize the following text in one short sentence (max 15 words):\n\n{chunk_text}"}
