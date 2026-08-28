@@ -966,14 +966,16 @@ def query_bot(
     search_query_embedding = query_embedding
     
     try:
+        from generation.generator import strip_thinking
         translation_prompt = f"Translate the following user query to English. Keep technical terms or names as they are. If it is already in English, just output it exactly as is. Output ONLY the translated query, without quotes or extra text:\n{body.query}"
         trans_res = groq_client.chat.completions.create(
             model="qwen/qwen3.6-27b",
             messages=[{"role": "user", "content": translation_prompt}],
             temperature=0.0,
-            max_tokens=60
+            max_tokens=1024
         )
-        translated = trans_res.choices[0].message.content.strip().strip('"\'')
+        translated_raw = trans_res.choices[0].message.content.strip().strip('"\'')
+        translated = strip_thinking(translated_raw).strip('"\'').strip()
         if translated and translated.lower() != body.query.lower():
             search_query = translated
             search_query_embedding = embedder.encode(search_query)
