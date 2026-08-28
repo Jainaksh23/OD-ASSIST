@@ -13,7 +13,7 @@ from db.db import SessionLocal
 from db.models import Source, User
 from ingestion.orchestrator import process_source
 
-PDF_DIR = r"D:\D\PDFS"
+PDF_DIR = r"D:\D\PDF2"
 
 def bulk_ingest():
     print("Loading embedder and Groq client...")

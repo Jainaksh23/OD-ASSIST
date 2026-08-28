@@ -47,7 +47,7 @@ def extract_text_from_pdf(file_path: str, groq_client=None) -> str:
         if vision_text and len(vision_text.strip()) > len(combined.strip()):
             return vision_text
 
-    return combined
+    return combined.replace('\x00', '')
 
 
 def _extract_via_vision(file_path: str, groq_client) -> str:

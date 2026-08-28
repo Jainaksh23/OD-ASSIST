@@ -97,11 +97,12 @@ def process_source(
             raise ValueError(f"Source {source_id} not found after processing.")
 
         for i, text_chunk in enumerate(chunks_text):
+            chunk_sum = summaries[i].replace('\x00', '') if summaries[i] else None
             db_chunks.append(
                 Chunk(
                     source_id=source.id,
-                    chunk_text=text_chunk,
-                    chunk_summary=summaries[i],
+                    chunk_text=text_chunk.replace('\x00', ''),
+                    chunk_summary=chunk_sum,
                     embedding=embeddings[i],
                 )
             )
