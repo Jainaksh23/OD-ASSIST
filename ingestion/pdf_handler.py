@@ -65,6 +65,7 @@ def _extract_via_vision(file_path: str, groq_client) -> str:
         try_count = 0
         while try_count < 3:
             try:
+                from generation.generator import strip_thinking
                 response = groq_client.chat.completions.create(
                     model=VISION_MODEL,
                     messages=[{
@@ -80,11 +81,10 @@ def _extract_via_vision(file_path: str, groq_client) -> str:
                         ],
                     }],
                     temperature=0.0,
-                    max_tokens=1024,
+                    max_tokens=2048,
                 )
-                text = response.choices[0].message.content.strip()
-                # Remove <think> tags often returned by Qwen
-                text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+                raw_text = response.choices[0].message.content.strip()
+                text = strip_thinking(raw_text)
                 page_texts.append(text)
                 break
             except Exception as e:

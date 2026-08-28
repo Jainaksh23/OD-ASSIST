@@ -14,7 +14,7 @@ def enrich_chunk(chunk_text: str, client: Groq) -> str:
                 {"role": "user", "content": f"Summarize the following text in one short sentence (max 15 words):\n\n{chunk_text}"}
             ],
             temperature=0.0,
-            max_tokens=512
+            max_tokens=1024
         )
         raw_summary = response.choices[0].message.content.strip()
         summary = strip_thinking(raw_summary)

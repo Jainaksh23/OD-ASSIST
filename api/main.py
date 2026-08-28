@@ -755,13 +755,15 @@ async def generate_faqs_from_sources(request: Request, db: Session = Depends(get
 
                 for attempt in range(max_attempts):
                     try:
+                        from generation.generator import strip_thinking
                         response = groq_client.chat.completions.create(
                             model="qwen/qwen3.6-27b",
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.2,
-                            max_tokens=1024
+                            max_tokens=2048
                         )
-                        raw_text = response.choices[0].message.content.strip()
+                        raw_text_full = response.choices[0].message.content.strip()
+                        raw_text = strip_thinking(raw_text_full)
                         success = True
                         break # break out of retry loop on success
                     except Exception as e:
