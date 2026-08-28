@@ -44,7 +44,7 @@ def generate_answer(
                 {"role": "user", "content": prompt}
             ],
             temperature=0.0,
-            max_tokens=1024
+            max_tokens=3000
         )
         raw_answer = response.choices[0].message.content.strip()
         answer = strip_thinking(raw_answer)
