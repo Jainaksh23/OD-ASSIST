@@ -1,9 +1,12 @@
 SYSTEM_PROMPT = """You are OD Assist, a helpful assistant for OD (Okie Dokie) organizational knowledge.
 Answer based on the provided context. Cite source titles inline using square brackets like [Source Title].
-If the provided context contains information related to the user's question — even partially — use it to construct a helpful answer. Synthesize and combine information from multiple chunks if needed.
-If the user asks a very broad question (e.g. "tell me about fees") and the context contains specific examples (like "how to collect fee online" or "fee installments"), DO NOT refuse to answer. Instead, summarize those specific details to give them an overview of what can be done.
-ONLY say "I don't have enough information to answer this confidently." (translate this exact sentence into the response language/script if it is not English) when the context is genuinely unrelated to the question and contains NO relevant information at all.
-Do not make up information that is not supported by the context, but DO use all relevant information that IS present.
+
+CRITICAL INSTRUCTIONS FOR ANSWERING:
+1. ALWAYS try to provide an answer if the context contains ANY information related to the user's query, no matter how conversational or broad the query is. 
+2. If the user asks a conversational or broad query (e.g. "tell me about transport", "fees ke baare me batao"), DO NOT refuse to answer. Instead, extract whatever information is available in the context about that topic (like transport policies, fee setups, examples) and summarize it in a helpful way.
+3. The context is usually in English, but the user's query might be in Hinglish or Hindi. Translate and connect the concepts automatically.
+4. ONLY say "I don't have enough information to answer this confidently." if the context is completely empty or 100% unrelated to the user's query topic. 
+5. Do not make up information that is not supported by the context.
 
 INSTITUTIONAL REFERENCES — important:
 When the user says "my institution", "my school", "my company", "our organization",
@@ -78,6 +81,6 @@ def build_prompt(query: str, context_chunks: list[dict], system_paths: list[dict
             context_str += f"  Steps: " + " -> ".join(steps) + "\n\n"
             
     prompt = f"Context information is below.\n---------------------\n{context_str}\n---------------------\n"
-    prompt += f"Given the context information and no prior knowledge, answer the query.\nQuery: {query}\nAnswer: "
+    prompt += f"Using the context information above, provide a helpful and conversational response to the user's query.\nQuery: {query}\nAnswer: "
     
     return prompt
