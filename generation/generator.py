@@ -2,7 +2,6 @@ import re
 # pyrefly: ignore [missing-import]
 from groq import Groq
 from generation.prompt_template import SYSTEM_PROMPT, build_prompt
-from typing import List, Dict, Any
 
 def strip_thinking(text: str) -> str:
     """
@@ -23,7 +22,13 @@ def strip_thinking(text: str) -> str:
     
     return text
 
-def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, system_paths: list[dict] = None, faqs: list[dict] = None) -> dict:
+def generate_answer(
+    query: str, 
+    retrieved_chunks: list[dict], 
+    client: Groq, 
+    system_paths: list[dict] | None = None, 
+    faqs: list[dict] | None = None
+) -> dict:
     """
     Calls Groq to generate an answer based on the context, system paths, and FAQs.
     Returns the answer text and the unique source IDs used.
@@ -33,7 +38,7 @@ def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, syst
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
@@ -48,16 +53,16 @@ def generate_answer(query: str, retrieved_chunks: list[dict], client: Groq, syst
             answer = "I don't have enough information to answer this confidently."
         
         # Extract unique source IDs from context chunks and faqs
-        sources_used = [chunk["source_id"] for chunk in retrieved_chunks if "source_id" in chunk]
+        sources_used = [chunk.get("source_id") for chunk in retrieved_chunks if chunk.get("source_id")]
         if faqs:
-            sources_used.extend([f["source_id"] for f in faqs if f.get("source_id")])
+            sources_used.extend([f.get("source_id") for f in faqs if f.get("source_id")])
         
         sources_used = list(set(sources_used))
         
         return {
             "answer": answer,
             "sources_used": sources_used,
-            "raw_response": response
+            "raw_response": response.model_dump()
         }
     except Exception as e:
         print(f"Error generating answer: {e}")
